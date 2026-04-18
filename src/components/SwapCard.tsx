@@ -1,0 +1,240 @@
+import { useMemo, useState } from "react";
+import { ArrowDown, Settings2, Sparkles, ChevronDown, Search, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { TOKENS, Token, findToken } from "@/lib/tokens";
+import { useWallet } from "@/store/wallet";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+
+const TokenButton = ({ token, onPick }: { token: Token; onPick: (t: Token) => void }) => {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+
+  const filtered = useMemo(
+    () =>
+      TOKENS.filter(
+        (t) =>
+          t.symbol.toLowerCase().includes(q.toLowerCase()) ||
+          t.name.toLowerCase().includes(q.toLowerCase())
+      ),
+    [q]
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-full bg-secondary hover:bg-secondary/70 transition-colors pl-1 pr-3 py-1 font-semibold"
+        >
+          <span className={cn("h-7 w-7 rounded-full grid place-items-center text-[11px] font-bold", token.chip)}>
+            {token.symbol.slice(0, 2)}
+          </span>
+          <span className="text-sm">{token.symbol}</span>
+          <ChevronDown className="h-4 w-4 opacity-60" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="rounded-3xl sm:max-w-md p-0 overflow-hidden">
+        <DialogHeader className="p-5 pb-3">
+          <DialogTitle>Select a token</DialogTitle>
+        </DialogHeader>
+        <div className="px-5 pb-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search name or paste address"
+              className="pl-9 rounded-xl h-11"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="max-h-80 overflow-y-auto pb-3">
+          {filtered.map((t) => (
+            <button
+              key={t.symbol}
+              onClick={() => {
+                onPick(t);
+                setOpen(false);
+                setQ("");
+              }}
+              className="w-full flex items-center gap-3 px-5 py-3 hover:bg-secondary text-left transition-colors"
+            >
+              <span className={cn("h-9 w-9 rounded-full grid place-items-center text-xs font-bold", t.chip)}>
+                {t.symbol.slice(0, 2)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm">{t.symbol}</div>
+                <div className="text-xs text-muted-foreground truncate">{t.name}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-mono">{t.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
+                <div className="text-xs text-muted-foreground">${(t.balance * t.usd).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export const SwapCard = () => {
+  const [fromSym, setFromSym] = useState("ETH");
+  const [toSym, setToSym] = useState("USDC");
+  const [amount, setAmount] = useState("");
+  const [swapping, setSwapping] = useState(false);
+
+  const from = findToken(fromSym);
+  const to = findToken(toSym);
+
+  const { connected, recordSwap } = useWallet();
+
+  const amountNum = parseFloat(amount) || 0;
+  const usdValue = amountNum * from.usd;
+  // tiny simulated fee
+  const out = usdValue ? (usdValue * 0.997) / to.usd : 0;
+  const pointsEarn = Math.max(0, Math.round(usdValue));
+
+  const flip = () => {
+    setFromSym(toSym);
+    setToSym(fromSym);
+    setAmount("");
+  };
+
+  const setMax = () => setAmount(String(from.balance));
+
+  const handleSwap = () => {
+    if (!connected) {
+      toast.error("Connect your wallet to swap");
+      return;
+    }
+    if (amountNum <= 0) {
+      toast.error("Enter an amount");
+      return;
+    }
+    if (amountNum > from.balance) {
+      toast.error("Insufficient balance", { description: `You only have ${from.balance} ${from.symbol}` });
+      return;
+    }
+    setSwapping(true);
+    setTimeout(() => {
+      recordSwap(usdValue);
+      setSwapping(false);
+      setAmount("");
+      toast.success(`Swapped ${amountNum} ${from.symbol} → ${out.toFixed(4)} ${to.symbol}`, {
+        description: `+${pointsEarn} BasePoints earned 🎉`,
+      });
+    }, 900);
+  };
+
+  return (
+    <div className="w-full max-w-md mx-auto">
+      <div className="rounded-3xl bg-gradient-card border border-border shadow-elev-lg p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display text-lg font-semibold">Swap</h3>
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+            <Settings2 className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* From */}
+        <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+            <span>You pay</span>
+            <button onClick={setMax} className="font-medium hover:text-foreground">
+              Balance: {from.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} · <span className="text-primary">Max</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              placeholder="0.0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="flex-1 bg-transparent outline-none text-3xl font-display font-semibold tracking-tight placeholder:text-muted-foreground/50 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <TokenButton token={from} onPick={(t) => setFromSym(t.symbol)} />
+          </div>
+          <div className="text-xs text-muted-foreground mt-2 h-4">
+            {usdValue > 0 && `$${usdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+          </div>
+        </div>
+
+        {/* Flip */}
+        <div className="relative h-0">
+          <button
+            onClick={flip}
+            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 rounded-xl bg-card border-4 border-background grid place-items-center hover:bg-primary hover:text-primary-foreground transition-colors shadow-elev-md"
+            aria-label="Flip tokens"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* To */}
+        <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4 mt-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+            <span>You receive</span>
+            <span>Balance: {to.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 text-3xl font-display font-semibold tracking-tight text-foreground/80 min-w-0 truncate">
+              {out > 0 ? out.toLocaleString(undefined, { maximumFractionDigits: 6 }) : "0.0"}
+            </div>
+            <TokenButton token={to} onPick={(t) => setToSym(t.symbol)} />
+          </div>
+          <div className="text-xs text-muted-foreground mt-2 h-4">
+            {out > 0 && `$${(out * to.usd).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+          </div>
+        </div>
+
+        {/* Quote details */}
+        {amountNum > 0 && (
+          <div className="mt-4 rounded-2xl bg-primary-soft/60 border border-primary/10 p-3 text-xs space-y-1.5">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Rate</span>
+              <span className="font-medium font-mono">1 {from.symbol} ≈ {(from.usd / to.usd).toLocaleString(undefined, { maximumFractionDigits: 6 })} {to.symbol}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Network fee</span>
+              <span className="font-medium">~$0.01 on Base</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Route</span>
+              <span className="font-medium">BasePoint Aggregator · 3 pools</span>
+            </div>
+            <div className="flex justify-between border-t border-primary/10 pt-1.5 mt-1.5">
+              <span className="text-primary font-semibold inline-flex items-center gap-1">
+                <Sparkles className="h-3 w-3" /> Points earned
+              </span>
+              <span className="font-bold text-primary">+{pointsEarn.toLocaleString()} pts</span>
+            </div>
+          </div>
+        )}
+
+        <Button
+          variant="hero"
+          size="xl"
+          className="w-full mt-4"
+          onClick={handleSwap}
+          disabled={swapping}
+        >
+          {swapping ? (
+            <><Loader2 className="h-5 w-5 animate-spin" /> Swapping…</>
+          ) : !connected ? (
+            "Connect wallet to swap"
+          ) : amountNum <= 0 ? (
+            "Enter an amount"
+          ) : amountNum > from.balance ? (
+            "Insufficient balance"
+          ) : (
+            `Swap ${from.symbol} → ${to.symbol}`
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+};
