@@ -21,4 +21,4 @@ export const TOKENS: Token[] = [
   { symbol: "ARC", name: "Arc Network", usd: 2.45, chip: "bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white", balance: 1500 },
 ];
 
-export const findToken = (symbol: string) => TOKENS.find((t) => t.symbol === symbol)!;
+export const findToken = (symbol: string) => TOKENS.find((t) => t.symbol === symbol) ?? TOKENS[0];

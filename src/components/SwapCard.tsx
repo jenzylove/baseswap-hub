@@ -82,8 +82,8 @@ const TokenButton = ({ token, onPick }: { token: Token; onPick: (t: Token) => vo
 };
 
 export const SwapCard = () => {
-  const [fromSym, setFromSym] = useState("ETH");
-  const [toSym, setToSym] = useState("USDC");
+  const [fromSym, setFromSym] = useState("USDC");
+  const [toSym, setToSym] = useState("EURC");
   const [amount, setAmount] = useState("");
   const [swapping, setSwapping] = useState(false);
 
