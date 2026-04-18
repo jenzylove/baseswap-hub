@@ -23,13 +23,13 @@ const Index = () => {
                 Swap any token in one tap
               </h2>
               <p className="text-muted-foreground mt-3 max-w-md">
-                BasePoint routes through every major DEX on Base to find you the best price — at fees that round to a penny.
+                Starlight routes through every major DEX on Base to find you the best price — at fees that round to a penny.
               </p>
               <ul className="mt-6 space-y-3 text-sm">
                 {[
                   "Aggregated routing across 14+ DEXes",
                   "Sub-second quotes, sub-second confirmations",
-                  "Earn 1 BasePoint for every $1 swapped",
+                  "Earn 1 Starlight Point for every $1 swapped",
                 ].map((s) => (
                   <li key={s} className="flex items-start gap-2.5">
                     <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />

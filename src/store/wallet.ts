@@ -69,6 +69,6 @@ export const useWallet = create<WalletState>()(
         return { ok: true, gained, newStreak };
       },
     }),
-    { name: "basepoint-wallet" }
+    { name: "starlight-wallet" }
   )
 );

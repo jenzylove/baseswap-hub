@@ -22,7 +22,7 @@ export const SiteHeader = () => {
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="font-display font-bold text-base tracking-tight">BasePoint</span>
+            <span className="font-display font-bold text-base tracking-tight">Starlight</span>
             <span className="text-[10px] font-medium text-muted-foreground -mt-0.5">DeFi on Base</span>
           </div>
         </a>

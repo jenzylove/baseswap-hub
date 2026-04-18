@@ -18,7 +18,7 @@ export const Hero = () => {
           </div>
 
           <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-balance">
-            Swap, earn, and farm <span className="bg-gradient-points bg-clip-text text-transparent">BasePoints</span>
+            Swap, earn, and farm <span className="bg-gradient-points bg-clip-text text-transparent">Starlight Points</span>
           </h1>
 
           <p className="mt-5 text-lg text-muted-foreground text-balance">
