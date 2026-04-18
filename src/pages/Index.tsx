@@ -17,13 +17,13 @@ const Index = () => {
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <div className="order-2 lg:order-1">
               <div className="inline-flex items-center gap-2 rounded-full bg-primary-soft text-primary px-3 py-1 text-xs font-semibold mb-3">
-                Best execution on Base
+                Best execution on Arc
               </div>
               <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-balance">
                 Swap any token in one tap
               </h2>
               <p className="text-muted-foreground mt-3 max-w-md">
-                Starlight routes through every major DEX on Base to find you the best price — at fees that round to a penny.
+                Starlight routes through every major DEX on Arc to find you the best price — with gas paid in USDC, no volatile gas token surprises.
               </p>
               <ul className="mt-6 space-y-3 text-sm">
                 {[
