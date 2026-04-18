@@ -114,7 +114,7 @@ export const PoolsSection = () => {
       setActive(null);
       setAmount("");
       toast.success(`Deposited $${amt.toLocaleString()} into ${active!.pair.join("/")}`, {
-        description: `Earning ${active!.apr.toFixed(1)}% APR · +${points} BasePoints`,
+        description: `Earning ${active!.apr.toFixed(1)}% APR · +${points} Starlight Points`,
       });
     }, 900);
   };
@@ -129,7 +129,7 @@ export const PoolsSection = () => {
           </div>
           <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight">Liquidity pools</h2>
           <p className="text-muted-foreground mt-2 max-w-xl">
-            Deposit into curated, audited pools and earn trading fees, partner rewards, and BasePoints — all at once.
+            Deposit into curated, audited pools and earn trading fees, partner rewards, and Starlight Points — all at once.
           </p>
         </div>
 

@@ -125,7 +125,7 @@ export const SwapCard = () => {
       setSwapping(false);
       setAmount("");
       toast.success(`Swapped ${amountNum} ${from.symbol} → ${out.toFixed(4)} ${to.symbol}`, {
-        description: `+${pointsEarn} BasePoints earned 🎉`,
+        description: `+${pointsEarn} Starlight Points earned 🎉`,
       });
     }, 900);
   };
@@ -204,7 +204,7 @@ export const SwapCard = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Route</span>
-              <span className="font-medium">BasePoint Aggregator · 3 pools</span>
+              <span className="font-medium">Starlight Aggregator · 3 pools</span>
             </div>
             <div className="flex justify-between border-t border-primary/10 pt-1.5 mt-1.5">
               <span className="text-primary font-semibold inline-flex items-center gap-1">

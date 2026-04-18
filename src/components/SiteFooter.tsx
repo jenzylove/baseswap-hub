@@ -8,7 +8,7 @@ export const SiteFooter = () => (
           <Sparkles className="h-4 w-4 text-primary-foreground" />
         </div>
         <div>
-          <div className="font-display font-bold text-sm">BasePoint</div>
+          <div className="font-display font-bold text-sm">Starlight</div>
           <div className="text-xs text-muted-foreground">© {new Date().getFullYear()} · Built on Base</div>
         </div>
       </div>

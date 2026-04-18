@@ -59,7 +59,7 @@ export const PointsDashboard = () => {
       toast.info("Already claimed today", { description: "Come back tomorrow for your streak bonus" });
       return;
     }
-    toast.success(`+${r.gained} BasePoints claimed!`, {
+    toast.success(`+${r.gained} Starlight Points claimed!`, {
       description: `🔥 ${r.newStreak}-day streak`,
     });
   };
@@ -74,7 +74,7 @@ export const PointsDashboard = () => {
     return list.slice(0, 8);
   }, [points, connected]);
 
-  const refLink = `https://basepoint.app/r/${referralCode}`;
+  const refLink = `https://starlight.app/r/${referralCode}`;
 
   return (
     <section id="points" className="bg-gradient-hero border-y border-border">
@@ -85,7 +85,7 @@ export const PointsDashboard = () => {
             Season 1 · Points farming
           </div>
           <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight">
-            Every action earns BasePoints
+            Every action earns Starlight Points
           </h2>
           <p className="text-muted-foreground mt-3">
             Swap, deposit, log in daily, invite friends. Points convert to rewards at season end.
@@ -100,7 +100,7 @@ export const PointsDashboard = () => {
 
             <div className="relative">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium opacity-80">Your BasePoints</span>
+                <span className="text-sm font-medium opacity-80">Your Starlight Points</span>
                 <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full bg-white/15 backdrop-blur px-2.5 py-1">
                   <Flame className="h-3.5 w-3.5" /> {streakDays}-day streak
                 </span>
