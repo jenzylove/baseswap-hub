@@ -1,0 +1,226 @@
+import { Sparkles, Flame, Users, Copy, Trophy, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useWallet } from "@/store/wallet";
+import { toast } from "sonner";
+import { useMemo } from "react";
+
+const LEADERBOARD = [
+  { rank: 1, addr: "0x7a3b…9f12", pts: 248_310 },
+  { rank: 2, addr: "based.eth", pts: 192_847 },
+  { rank: 3, addr: "0x91c4…4a08", pts: 161_204 },
+  { rank: 4, addr: "0x2d8e…b771", pts: 142_005 },
+  { rank: 5, addr: "degenmom.eth", pts: 119_640 },
+  { rank: 6, addr: "0x5c11…ee93", pts: 98_220 },
+  { rank: 7, addr: "0xa4f0…1c5a", pts: 88_104 },
+];
+
+const StatCard = ({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  tone = "primary",
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: React.ReactNode;
+  sub?: string;
+  tone?: "primary" | "accent" | "warning";
+}) => {
+  const toneMap = {
+    primary: "bg-primary-soft text-primary",
+    accent: "bg-accent-soft text-accent",
+    warning: "bg-warning/10 text-warning",
+  } as const;
+  return (
+    <div className="rounded-2xl bg-card border border-border p-5 shadow-card">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <div className={`h-8 w-8 rounded-lg grid place-items-center ${toneMap[tone]}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      <div className="font-display text-2xl md:text-3xl font-bold tracking-tight">{value}</div>
+      {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
+    </div>
+  );
+};
+
+export const PointsDashboard = () => {
+  const { connected, points, streakDays, lastClaimDate, swapsCount, volumeUsd, referralCode, referrals, claimDaily } =
+    useWallet();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const claimedToday = lastClaimDate === today;
+
+  const onClaim = () => {
+    const r = claimDaily();
+    if (!r.ok) {
+      toast.info("Already claimed today", { description: "Come back tomorrow for your streak bonus" });
+      return;
+    }
+    toast.success(`+${r.gained} BasePoints claimed!`, {
+      description: `🔥 ${r.newStreak}-day streak`,
+    });
+  };
+
+  const userBoard = useMemo(() => {
+    const list = [...LEADERBOARD];
+    if (connected) {
+      list.push({ rank: 0, addr: "You", pts: points });
+      list.sort((a, b) => b.pts - a.pts);
+      list.forEach((r, i) => (r.rank = i + 1));
+    }
+    return list.slice(0, 8);
+  }, [points, connected]);
+
+  const refLink = `https://basepoint.app/r/${referralCode}`;
+
+  return (
+    <section id="points" className="bg-gradient-hero border-y border-border">
+      <div className="container py-20">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <div className="inline-flex items-center gap-2 rounded-full bg-gradient-points text-primary-foreground px-3 py-1 text-xs font-semibold mb-3">
+            <Sparkles className="h-3.5 w-3.5" />
+            Season 1 · Points farming
+          </div>
+          <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight">
+            Every action earns BasePoints
+          </h2>
+          <p className="text-muted-foreground mt-3">
+            Swap, deposit, log in daily, invite friends. Points convert to rewards at season end.
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Left: Big points card */}
+          <div className="lg:col-span-2 rounded-3xl bg-gradient-points text-primary-foreground p-6 md:p-8 shadow-elev-lg relative overflow-hidden">
+            <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10 blur-2xl" aria-hidden />
+            <div className="absolute right-10 bottom-0 h-40 w-40 rounded-full bg-white/10 blur-2xl" aria-hidden />
+
+            <div className="relative">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium opacity-80">Your BasePoints</span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full bg-white/15 backdrop-blur px-2.5 py-1">
+                  <Flame className="h-3.5 w-3.5" /> {streakDays}-day streak
+                </span>
+              </div>
+              <div className="font-display text-5xl md:text-6xl font-bold tracking-tight">
+                {points.toLocaleString()}
+              </div>
+              <div className="text-sm opacity-80 mt-1">
+                {connected ? "Keep interacting to climb the leaderboard." : "Connect your wallet to start farming."}
+              </div>
+
+              <div className="mt-6 grid grid-cols-3 gap-2 md:gap-3">
+                <div className="rounded-2xl bg-white/10 backdrop-blur p-3">
+                  <div className="text-[10px] uppercase tracking-wider opacity-70">Swaps</div>
+                  <div className="font-display text-xl font-bold mt-1">{swapsCount}</div>
+                </div>
+                <div className="rounded-2xl bg-white/10 backdrop-blur p-3">
+                  <div className="text-[10px] uppercase tracking-wider opacity-70">Volume</div>
+                  <div className="font-display text-xl font-bold mt-1">
+                    ${volumeUsd >= 1000 ? `${(volumeUsd / 1000).toFixed(1)}K` : volumeUsd.toFixed(0)}
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-white/10 backdrop-blur p-3">
+                  <div className="text-[10px] uppercase tracking-wider opacity-70">Referrals</div>
+                  <div className="font-display text-xl font-bold mt-1">{referrals}</div>
+                </div>
+              </div>
+
+              <Button
+                variant="secondary"
+                size="lg"
+                className="mt-6 bg-white text-primary hover:bg-white/90"
+                onClick={onClaim}
+                disabled={!connected || claimedToday}
+              >
+                <Zap className="h-4 w-4" />
+                {!connected
+                  ? "Connect wallet to claim"
+                  : claimedToday
+                  ? `Claimed today · come back tomorrow`
+                  : `Claim daily +${50 + Math.min(streakDays + 1, 30) * 10} pts`}
+              </Button>
+            </div>
+          </div>
+
+          {/* Right: Stats + Referral */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <StatCard icon={Sparkles} label="Per $1 swap" value="1 pt" tone="primary" />
+              <StatCard icon={Flame} label="Daily bonus" value={`+${50 + Math.min(streakDays + 1, 30) * 10}`} sub="Tomorrow" tone="warning" />
+            </div>
+
+            <div className="rounded-2xl bg-card border border-border p-5 shadow-card">
+              <div className="flex items-center gap-2 mb-1">
+                <Users className="h-4 w-4 text-accent" />
+                <span className="text-sm font-semibold">Referral link</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">Earn 10% of all points your friends farm.</p>
+              <div className="flex items-center gap-2 rounded-xl bg-secondary p-2 pl-3">
+                <code className="flex-1 text-xs font-mono truncate">{refLink}</code>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={() => {
+                    navigator.clipboard.writeText(refLink);
+                    toast.success("Referral link copied");
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5" /> Copy
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Leaderboard */}
+        <div className="mt-10 rounded-3xl bg-card border border-border shadow-card overflow-hidden">
+          <div className="flex items-center justify-between p-5 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-warning" />
+              <h3 className="font-display text-lg font-semibold">Season 1 leaderboard</h3>
+            </div>
+            <span className="text-xs text-muted-foreground">Updated live</span>
+          </div>
+          <ul className="divide-y divide-border">
+            {userBoard.map((row) => {
+              const isYou = row.addr === "You";
+              return (
+                <li
+                  key={row.rank + row.addr}
+                  className={`flex items-center gap-4 px-5 py-3 ${isYou ? "bg-primary-soft" : ""}`}
+                >
+                  <div
+                    className={`h-8 w-8 rounded-lg grid place-items-center font-bold text-sm ${
+                      row.rank === 1
+                        ? "bg-warning text-warning-foreground"
+                        : row.rank === 2
+                        ? "bg-muted text-foreground"
+                        : row.rank === 3
+                        ? "bg-amber-200 text-amber-900"
+                        : "bg-secondary text-muted-foreground"
+                    }`}
+                  >
+                    {row.rank}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={`font-mono text-sm ${isYou ? "text-primary font-bold" : "font-medium"}`}>
+                      {row.addr}
+                    </div>
+                  </div>
+                  <div className="font-display font-bold tabular-nums">
+                    {row.pts.toLocaleString()} <span className="text-xs text-muted-foreground font-normal">pts</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+};
