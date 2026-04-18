@@ -14,7 +14,7 @@ export const Hero = () => {
         <div className="mx-auto max-w-3xl text-center animate-fade-up">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 backdrop-blur px-4 py-1.5 text-xs font-semibold mb-6">
             <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-            Live on <span className="text-primary">Base</span> · Season 1 points are open
+            Live on <span className="text-primary">Arc</span> · Season 1 points are open
           </div>
 
           <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-balance">
@@ -22,7 +22,7 @@ export const Hero = () => {
           </h1>
 
           <p className="mt-5 text-lg text-muted-foreground text-balance">
-            The clean, fast home for DeFi on Base. Trade any token, deposit into 25% APR stable pools, and farm points every time you interact.
+            The clean, fast home for stablecoin DeFi on Arc. Trade any token, deposit into 25% APR stable pools, and farm points every time you interact.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
