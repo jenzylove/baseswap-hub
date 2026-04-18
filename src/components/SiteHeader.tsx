@@ -11,7 +11,7 @@ const links = [
 ];
 
 export const SiteHeader = () => {
-  const points = useWallet((s) => s.points);
+  const { points } = useWallet();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/70 backdrop-blur-xl">
