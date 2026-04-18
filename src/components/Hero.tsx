@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useWallet } from "@/store/wallet";
 
 export const Hero = () => {
-  const connected = useWallet((s) => s.connected);
+  const { connected } = useWallet();
 
   return (
     <section className="relative overflow-hidden bg-gradient-hero">

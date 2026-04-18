@@ -1,74 +1,130 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useAccount, useBalance } from "wagmi";
 
-type WalletState = {
-  connected: boolean;
-  address: string | null;
-  ethBalance: number;
-  points: number;
-  streakDays: number;
-  lastClaimDate: string | null;
-  swapsCount: number;
-  volumeUsd: number;
-  referralCode: string;
-  referrals: number;
+/* ============================================================
+   Points store — purely off-chain progression (swaps, streaks,
+   referrals). Persisted in localStorage. Keyed by wallet address
+   so different wallets keep separate points.
+   ============================================================ */
 
-  connect: () => void;
-  disconnect: () => void;
-  addPoints: (n: number) => void;
-  recordSwap: (volumeUsd: number) => void;
-  claimDaily: () => { ok: boolean; gained: number; newStreak: number };
+type PointsState = {
+  // Per-address state map
+  byAddress: Record<
+    string,
+    {
+      points: number;
+      streakDays: number;
+      lastClaimDate: string | null;
+      swapsCount: number;
+      volumeUsd: number;
+      referrals: number;
+    }
+  >;
+  referralCode: string; // global for this browser
+
+  addPoints: (address: string, n: number) => void;
+  recordSwap: (address: string, volumeUsd: number) => void;
+  claimDaily: (address: string) => { ok: boolean; gained: number; newStreak: number };
 };
-
-const genAddress = () =>
-  "0x" + Array.from({ length: 40 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
 
 const genCode = () =>
   Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join("");
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
-export const useWallet = create<WalletState>()(
+const blank = () => ({
+  points: 0,
+  streakDays: 0,
+  lastClaimDate: null as string | null,
+  swapsCount: 0,
+  volumeUsd: 0,
+  referrals: 0,
+});
+
+const usePointsStore = create<PointsState>()(
   persist(
     (set, get) => ({
-      connected: false,
-      address: null,
-      ethBalance: 1.842,
-      points: 0,
-      streakDays: 0,
-      lastClaimDate: null,
-      swapsCount: 0,
-      volumeUsd: 0,
+      byAddress: {},
       referralCode: genCode(),
-      referrals: 0,
 
-      connect: () => set({ connected: true, address: genAddress() }),
-      disconnect: () => set({ connected: false, address: null }),
-      addPoints: (n) => set({ points: Math.round(get().points + n) }),
-      recordSwap: (volumeUsd) => {
-        const earned = Math.max(1, Math.round(volumeUsd * 1)); // 1 pt per $1
-        set({
-          swapsCount: get().swapsCount + 1,
-          volumeUsd: get().volumeUsd + volumeUsd,
-          points: get().points + earned,
-        });
-      },
-      claimDaily: () => {
+      addPoints: (address, n) =>
+        set((s) => {
+          const cur = s.byAddress[address] ?? blank();
+          return { byAddress: { ...s.byAddress, [address]: { ...cur, points: Math.round(cur.points + n) } } };
+        }),
+
+      recordSwap: (address, volumeUsd) =>
+        set((s) => {
+          const cur = s.byAddress[address] ?? blank();
+          const earned = Math.max(1, Math.round(volumeUsd));
+          return {
+            byAddress: {
+              ...s.byAddress,
+              [address]: {
+                ...cur,
+                swapsCount: cur.swapsCount + 1,
+                volumeUsd: cur.volumeUsd + volumeUsd,
+                points: cur.points + earned,
+              },
+            },
+          };
+        }),
+
+      claimDaily: (address) => {
+        const cur = get().byAddress[address] ?? blank();
         const today = todayStr();
-        const last = get().lastClaimDate;
-        if (last === today) return { ok: false, gained: 0, newStreak: get().streakDays };
-
+        if (cur.lastClaimDate === today) return { ok: false, gained: 0, newStreak: cur.streakDays };
         const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-        const newStreak = last === yesterday ? get().streakDays + 1 : 1;
-        const gained = 50 + Math.min(newStreak, 30) * 10; // streak bonus capped
-        set({
-          lastClaimDate: today,
-          streakDays: newStreak,
-          points: get().points + gained,
-        });
+        const newStreak = cur.lastClaimDate === yesterday ? cur.streakDays + 1 : 1;
+        const gained = 50 + Math.min(newStreak, 30) * 10;
+        set((s) => ({
+          byAddress: {
+            ...s.byAddress,
+            [address]: {
+              ...cur,
+              lastClaimDate: today,
+              streakDays: newStreak,
+              points: cur.points + gained,
+            },
+          },
+        }));
         return { ok: true, gained, newStreak };
       },
     }),
-    { name: "starlight-wallet" }
+    { name: "starlight-points-v2" }
   )
 );
+
+/* ============================================================
+   Combined hook — real wagmi connection + persisted points.
+   Returns the same shape consumers were using before.
+   ============================================================ */
+
+export const useWallet = () => {
+  const { address, isConnected } = useAccount();
+  const { data: balance } = useBalance({ address });
+
+  const store = usePointsStore();
+  const key = address?.toLowerCase() ?? "__guest__";
+  const data = store.byAddress[key] ?? blank();
+
+  return {
+    connected: isConnected,
+    address: address ?? null,
+    ethBalance: balance ? parseFloat(balance.formatted) : 0,
+    nativeSymbol: balance?.symbol ?? "ETH",
+
+    points: data.points,
+    streakDays: data.streakDays,
+    lastClaimDate: data.lastClaimDate,
+    swapsCount: data.swapsCount,
+    volumeUsd: data.volumeUsd,
+    referralCode: store.referralCode,
+    referrals: data.referrals,
+
+    addPoints: (n: number) => store.addPoints(key, n),
+    recordSwap: (volumeUsd: number) => store.recordSwap(key, volumeUsd),
+    claimDaily: () => store.claimDaily(key),
+  };
+};
