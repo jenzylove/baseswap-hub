@@ -40,7 +40,7 @@ export const ConnectWallet = ({ size = "default" }: { size?: "default" | "lg" })
           );
         }
 
-        return <ConnectedMenu address={account.address} chainId={chain.id} size={size} />;
+        return <ConnectedMenu address={account.address as `0x${string}`} chainId={chain.id} size={size} />;
       }}
     </ConnectButton.Custom>
   );
