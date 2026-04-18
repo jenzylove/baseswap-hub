@@ -26,7 +26,7 @@ export const ConnectWallet = ({ size = "default" }: { size?: "default" | "lg" })
       connect();
       setConnecting(false);
       toast.success(`Connected with ${provider}`, {
-        description: "Wallet linked on Base. Read-only mode.",
+        description: "Wallet linked on Arc. Read-only mode.",
       });
     }, 700);
   };
@@ -43,7 +43,7 @@ export const ConnectWallet = ({ size = "default" }: { size?: "default" | "lg" })
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64 rounded-2xl p-2">
             <DropdownMenuLabel className="px-3 py-2 text-xs font-medium text-muted-foreground">
-              Connect on Base
+              Connect on Arc
             </DropdownMenuLabel>
             <DropdownMenuItem
               className="rounded-xl px-3 py-3 cursor-pointer"
@@ -66,7 +66,7 @@ export const ConnectWallet = ({ size = "default" }: { size?: "default" | "lg" })
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-sm">Coinbase Wallet</div>
-                <div className="text-xs text-muted-foreground">Recommended on Base</div>
+                <div className="text-xs text-muted-foreground">Stablecoin-friendly</div>
               </div>
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -98,7 +98,7 @@ export const ConnectWallet = ({ size = "default" }: { size?: "default" | "lg" })
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72 rounded-2xl p-2">
         <div className="px-3 py-3">
-          <div className="text-xs text-muted-foreground mb-1">Connected on Base</div>
+          <div className="text-xs text-muted-foreground mb-1">Connected on Arc</div>
           <div className="font-mono text-sm font-semibold">{shorten(address!)}</div>
           <div className="mt-3 rounded-xl bg-secondary p-3">
             <div className="text-xs text-muted-foreground">Balance</div>
@@ -117,8 +117,8 @@ export const ConnectWallet = ({ size = "default" }: { size?: "default" | "lg" })
           <Copy className="h-4 w-4" /> Copy address
         </DropdownMenuItem>
         <DropdownMenuItem className="rounded-lg cursor-pointer" asChild>
-          <a href={`https://basescan.org/address/${address}`} target="_blank" rel="noreferrer">
-            <ExternalLink className="h-4 w-4" /> View on Basescan
+          <a href={`https://explorer.arc.network/address/${address}`} target="_blank" rel="noreferrer">
+            <ExternalLink className="h-4 w-4" /> View on Arc Explorer
           </a>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

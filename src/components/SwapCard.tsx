@@ -200,7 +200,7 @@ export const SwapCard = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Network fee</span>
-              <span className="font-medium">~$0.01 on Base</span>
+              <span className="font-medium">~0.01 USDC on Arc</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Route</span>

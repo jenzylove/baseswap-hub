@@ -23,7 +23,7 @@ export const SiteHeader = () => {
           </div>
           <div className="flex flex-col leading-tight">
             <span className="font-display font-bold text-base tracking-tight">Starlight</span>
-            <span className="text-[10px] font-medium text-muted-foreground -mt-0.5">DeFi on Base</span>
+            <span className="text-[10px] font-medium text-muted-foreground -mt-0.5">DeFi on Arc</span>
           </div>
         </a>
 

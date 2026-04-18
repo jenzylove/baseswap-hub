@@ -6,7 +6,7 @@ import { useMemo } from "react";
 
 const LEADERBOARD = [
   { rank: 1, addr: "0x7a3b…9f12", pts: 248_310 },
-  { rank: 2, addr: "based.eth", pts: 192_847 },
+  { rank: 2, addr: "arcwhale.eth", pts: 192_847 },
   { rank: 3, addr: "0x91c4…4a08", pts: 161_204 },
   { rank: 4, addr: "0x2d8e…b771", pts: 142_005 },
   { rank: 5, addr: "degenmom.eth", pts: 119_640 },

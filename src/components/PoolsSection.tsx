@@ -22,7 +22,7 @@ const TokenChip = ({ symbol }: { symbol: string }) => {
 
 const PoolCard = ({ pool, onDeposit }: { pool: Pool; onDeposit: (p: Pool) => void }) => {
   const [a, b] = pool.pair;
-  const isStable = pool.apr <= 30 && [a, b].every((s) => ["USDC", "USDbC", "DAI"].includes(s));
+  const isStable = pool.apr <= 30 && [a, b].every((s) => ["USDC", "USDT", "DAI", "PYUSD", "EURC"].includes(s));
   return (
     <div className={cn(
       "group rounded-3xl bg-gradient-card border border-border p-5 shadow-card hover:shadow-elev-lg transition-all hover:-translate-y-0.5",
@@ -88,9 +88,10 @@ export const PoolsSection = () => {
   const { connected, addPoints } = useWallet();
 
   const filtered = useMemo(() => {
+    const stables = ["USDC", "USDT", "DAI", "PYUSD", "EURC"];
     if (tab === "stable")
-      return POOLS.filter((p) => ["USDC", "USDbC", "DAI"].some((s) => p.pair.includes(s)) && p.apr <= 30);
-    if (tab === "volatile") return POOLS.filter((p) => p.apr > 30 || ["ETH", "WETH", "cbETH"].some((s) => p.pair.includes(s)));
+      return POOLS.filter((p) => p.pair.every((s) => stables.includes(s)) && p.apr <= 30);
+    if (tab === "volatile") return POOLS.filter((p) => p.apr > 30 || ["WETH", "WBTC", "ARC"].some((s) => p.pair.includes(s)));
     return POOLS;
   }, [tab]);
 
