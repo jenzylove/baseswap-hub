@@ -1,24 +1,28 @@
 import { defineChain } from "viem";
 
 /**
- * Arc Sepolia — Circle's Arc L1 testnet.
- * Note: Arc is currently in private/invite-only testnet (late 2025).
- * Public RPC details may change once Circle opens it broadly.
- * Sources: arc.network, docs.arc.network
+ * Arc Testnet — Circle's Arc L1 public testnet.
+ * Official details from Circle's Arc docs.
  */
-export const arcSepolia = defineChain({
-  id: 10241025,
-  name: "Arc Sepolia",
-  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 6 },
+export const arcTestnet = defineChain({
+  id: 5042002,
+  name: "Arc Testnet",
+  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://rpc.sepolia.arc.network"] },
-    public: { http: ["https://rpc.sepolia.arc.network"] },
+    default: { http: ["https://rpc.testnet.arc.network"] },
+    public: { http: ["https://rpc.testnet.arc.network"] },
   },
   blockExplorers: {
-    default: { name: "Arc Explorer", url: "https://explorer.sepolia.arc.network" },
+    default: { name: "Arcscan", url: "https://testnet.arcscan.app" },
   },
   testnet: true,
 });
+
+/**
+ * Backwards-compatible alias — earlier code imported `arcSepolia`.
+ * Both names now point at the same official Arc Testnet definition.
+ */
+export const arcSepolia = arcTestnet;
 
 /** Base Sepolia — fully public Ethereum L2 testnet, usable today. */
 export const baseSepolia = defineChain({
