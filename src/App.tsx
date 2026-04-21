@@ -10,6 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { wagmiConfig } from "@/lib/wagmi";
 import Index from "./pages/Index.tsx";
+import Faucet from "./pages/Faucet.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 import "@rainbow-me/rainbowkit/styles.css";
@@ -44,6 +45,7 @@ const App = () => (
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/faucet" element={<Faucet />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

@@ -4,10 +4,10 @@ import { Sparkles } from "lucide-react";
 import { useWallet } from "@/store/wallet";
 
 const links = [
-  { label: "Swap", href: "#swap" },
-  { label: "Pools", href: "#pools" },
-  { label: "Points", href: "#points" },
-  { label: "Docs", href: "#docs" },
+  { label: "Swap", href: "/#swap" },
+  { label: "Pools", href: "/#pools" },
+  { label: "Points", href: "/#points" },
+  { label: "Faucet", href: "/faucet" },
 ];
 
 export const SiteHeader = () => {
