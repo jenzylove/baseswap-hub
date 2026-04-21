@@ -1,16 +1,29 @@
 import { useMemo, useState } from "react";
-import { ArrowDown, Settings2, Sparkles, ChevronDown, Search, Loader2 } from "lucide-react";
+import { ArrowDown, Settings2, Sparkles, ChevronDown, Search } from "lucide-react";
+import { useAccount, useBalance } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { TOKENS, Token, findToken } from "@/lib/tokens";
-import { useWallet } from "@/store/wallet";
+import { TOKENS, Token, findToken, ARC_TESTNET_CHAIN_ID } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+/** Read an ERC-20 balance for a token on Arc Testnet. Returns 0 when disconnected. */
+const useTokenBalance = (token: Token) => {
+  const { address } = useAccount();
+  const { data } = useBalance({
+    address,
+    token: token.address,
+    chainId: ARC_TESTNET_CHAIN_ID,
+    query: { enabled: Boolean(address) },
+  });
+  return data ? parseFloat(data.formatted) : 0;
+};
 
 const TokenButton = ({ token, onPick }: { token: Token; onPick: (t: Token) => void }) => {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const { address } = useAccount();
 
   const filtered = useMemo(
     () =>
@@ -53,27 +66,16 @@ const TokenButton = ({ token, onPick }: { token: Token; onPick: (t: Token) => vo
         </div>
         <div className="max-h-80 overflow-y-auto pb-3">
           {filtered.map((t) => (
-            <button
+            <TokenRow
               key={t.symbol}
-              onClick={() => {
+              token={t}
+              connected={Boolean(address)}
+              onPick={() => {
                 onPick(t);
                 setOpen(false);
                 setQ("");
               }}
-              className="w-full flex items-center gap-3 px-5 py-3 hover:bg-secondary text-left transition-colors"
-            >
-              <span className={cn("h-9 w-9 rounded-full grid place-items-center text-xs font-bold", t.chip)}>
-                {t.symbol.slice(0, 2)}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm">{t.symbol}</div>
-                <div className="text-xs text-muted-foreground truncate">{t.name}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-mono">{t.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
-                <div className="text-xs text-muted-foreground">${(t.balance * t.usd).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-              </div>
-            </button>
+            />
           ))}
         </div>
       </DialogContent>
@@ -81,16 +83,43 @@ const TokenButton = ({ token, onPick }: { token: Token; onPick: (t: Token) => vo
   );
 };
 
+const TokenRow = ({ token, connected, onPick }: { token: Token; connected: boolean; onPick: () => void }) => {
+  const balance = useTokenBalance(token);
+  return (
+    <button
+      onClick={onPick}
+      className="w-full flex items-center gap-3 px-5 py-3 hover:bg-secondary text-left transition-colors"
+    >
+      <span className={cn("h-9 w-9 rounded-full grid place-items-center text-xs font-bold", token.chip)}>
+        {token.symbol.slice(0, 2)}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-sm">{token.symbol}</div>
+        <div className="text-xs text-muted-foreground truncate">{token.name}</div>
+      </div>
+      <div className="text-right">
+        <div className="text-sm font-mono">
+          {connected ? balance.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "0.00"}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          ${(balance * token.usd).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+        </div>
+      </div>
+    </button>
+  );
+};
+
 export const SwapCard = () => {
   const [fromSym, setFromSym] = useState("USDC");
   const [toSym, setToSym] = useState("EURC");
   const [amount, setAmount] = useState("");
-  const [swapping, setSwapping] = useState(false);
 
   const from = findToken(fromSym);
   const to = findToken(toSym);
 
-  const { connected, recordSwap } = useWallet();
+  const { isConnected } = useAccount();
+  const fromBalance = useTokenBalance(from);
+  const toBalance = useTokenBalance(to);
 
   const amountNum = parseFloat(amount) || 0;
   const usdValue = amountNum * from.usd;
@@ -104,10 +133,10 @@ export const SwapCard = () => {
     setAmount("");
   };
 
-  const setMax = () => setAmount(String(from.balance));
+  const setMax = () => setAmount(String(fromBalance));
 
   const handleSwap = () => {
-    if (!connected) {
+    if (!isConnected) {
       toast.error("Connect your wallet to swap");
       return;
     }
@@ -115,19 +144,9 @@ export const SwapCard = () => {
       toast.error("Enter an amount");
       return;
     }
-    if (amountNum > from.balance) {
-      toast.error("Insufficient balance", { description: `You only have ${from.balance} ${from.symbol}` });
-      return;
-    }
-    setSwapping(true);
-    setTimeout(() => {
-      recordSwap(usdValue);
-      setSwapping(false);
-      setAmount("");
-      toast.success(`Swapped ${amountNum} ${from.symbol} → ${out.toFixed(4)} ${to.symbol}`, {
-        description: `+${pointsEarn} Starlight Points earned 🎉`,
-      });
-    }, 900);
+    toast.info("Swap coming soon — powered by Circle App Kits", {
+      description: "Real on-chain swaps will be wired up in the next step.",
+    });
   };
 
   return (
@@ -145,7 +164,7 @@ export const SwapCard = () => {
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span>You pay</span>
             <button onClick={setMax} className="font-medium hover:text-foreground">
-              Balance: {from.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} · <span className="text-primary">Max</span>
+              Balance: {isConnected ? fromBalance.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "0.00"} · <span className="text-primary">Max</span>
             </button>
           </div>
           <div className="flex items-center gap-3">
@@ -178,7 +197,7 @@ export const SwapCard = () => {
         <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4 mt-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span>You receive</span>
-            <span>Balance: {to.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+            <span>Balance: {isConnected ? toBalance.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "0.00"}</span>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex-1 text-3xl font-display font-semibold tracking-tight text-foreground/80 min-w-0 truncate">
@@ -220,19 +239,12 @@ export const SwapCard = () => {
           size="xl"
           className="w-full mt-4"
           onClick={handleSwap}
-          disabled={swapping}
         >
-          {swapping ? (
-            <><Loader2 className="h-5 w-5 animate-spin" /> Swapping…</>
-          ) : !connected ? (
-            "Connect wallet to swap"
-          ) : amountNum <= 0 ? (
-            "Enter an amount"
-          ) : amountNum > from.balance ? (
-            "Insufficient balance"
-          ) : (
-            `Swap ${from.symbol} → ${to.symbol}`
-          )}
+          {!isConnected
+            ? "Connect wallet to swap"
+            : amountNum <= 0
+            ? "Enter an amount"
+            : "Swap coming soon — powered by Circle App Kits"}
         </Button>
       </div>
     </div>
