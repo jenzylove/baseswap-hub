@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { arcSepolia, baseSepolia } from "@/lib/chains";
+import { arcTestnet, baseSepolia } from "@/lib/chains";
 
 const shorten = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -59,9 +59,9 @@ const ConnectedMenu = ({
   const { switchChain } = useSwitchChain();
   const { data: balance } = useBalance({ address });
 
-  const isArc = chainId === arcSepolia.id;
-  const chainName = isArc ? "Arc Sepolia" : chainId === baseSepolia.id ? "Base Sepolia" : "Unknown";
-  const explorer = isArc ? arcSepolia.blockExplorers.default.url : baseSepolia.blockExplorers.default.url;
+  const isArc = chainId === arcTestnet.id;
+  const chainName = isArc ? "Arc Testnet" : chainId === baseSepolia.id ? "Base Sepolia" : "Unknown";
+  const explorer = isArc ? arcTestnet.blockExplorers.default.url : baseSepolia.blockExplorers.default.url;
 
   return (
     <DropdownMenu>
@@ -97,12 +97,12 @@ const ConnectedMenu = ({
         </DropdownMenuLabel>
         <DropdownMenuItem
           className="rounded-lg cursor-pointer"
-          disabled={chainId === arcSepolia.id}
-          onClick={() => switchChain({ chainId: arcSepolia.id })}
+          disabled={chainId === arcTestnet.id}
+          onClick={() => switchChain({ chainId: arcTestnet.id })}
         >
           <span className="h-2 w-2 rounded-full bg-gradient-points" />
-          Arc Sepolia
-          {chainId === arcSepolia.id && <span className="ml-auto text-xs text-primary">Active</span>}
+          Arc Testnet
+          {chainId === arcTestnet.id && <span className="ml-auto text-xs text-primary">Active</span>}
         </DropdownMenuItem>
         <DropdownMenuItem
           className="rounded-lg cursor-pointer"

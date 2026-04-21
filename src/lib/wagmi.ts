@@ -1,5 +1,5 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { arcSepolia, baseSepolia } from "./chains";
+import { arcTestnet, baseSepolia } from "./chains";
 
 /**
  * WalletConnect projectId — get a free one at https://cloud.reown.com.
@@ -12,6 +12,7 @@ const WALLETCONNECT_PROJECT_ID =
 export const wagmiConfig = getDefaultConfig({
   appName: "Starlight",
   projectId: WALLETCONNECT_PROJECT_ID,
-  chains: [arcSepolia, baseSepolia],
+  // Arc Testnet listed first → becomes the default network in RainbowKit.
+  chains: [arcTestnet, baseSepolia],
   ssr: false,
 });
