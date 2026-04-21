@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
-import { ArrowDown, Settings2, Sparkles, ChevronDown, Search } from "lucide-react";
-import { useAccount, useBalance } from "wagmi";
+import { ArrowDown, Settings2, Sparkles, ChevronDown, Search, Loader2 } from "lucide-react";
+import { useAccount, useBalance, useWalletClient } from "wagmi";
+import { createViemAdapter } from "@circle-fin/adapter-viem-v2";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { TOKENS, Token, findToken, ARC_TESTNET_CHAIN_ID } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { kit, CIRCLE_KIT_KEY } from "@/lib/circleKit";
 
 /** Read an ERC-20 balance for a token on Arc Testnet. Returns 0 when disconnected. */
 const useTokenBalance = (token: Token) => {
@@ -118,8 +120,11 @@ export const SwapCard = () => {
   const to = findToken(toSym);
 
   const { isConnected } = useAccount();
+  const { data: walletClient } = useWalletClient({ chainId: ARC_TESTNET_CHAIN_ID });
   const fromBalance = useTokenBalance(from);
   const toBalance = useTokenBalance(to);
+  const [swapping, setSwapping] = useState(false);
+  const connected = isConnected;
 
   const amountNum = parseFloat(amount) || 0;
   const usdValue = amountNum * from.usd;
@@ -135,8 +140,8 @@ export const SwapCard = () => {
 
   const setMax = () => setAmount(String(fromBalance));
 
-  const handleSwap = () => {
-    if (!isConnected) {
+  const handleSwap = async () => {
+    if (!connected) {
       toast.error("Connect your wallet to swap");
       return;
     }
@@ -144,9 +149,31 @@ export const SwapCard = () => {
       toast.error("Enter an amount");
       return;
     }
-    toast.info("Swap coming soon — powered by Circle App Kits", {
-      description: "Real on-chain swaps will be wired up in the next step.",
-    });
+    if (!walletClient) {
+      toast.error("Wallet not ready", {
+        description: "Make sure you're connected to Arc Testnet (Chain ID 5042002).",
+      });
+      return;
+    }
+    setSwapping(true);
+    try {
+      const adapter = createViemAdapter({ walletClient });
+      const result = await kit.swap({
+        from: { adapter, chain: "Arc_Testnet" },
+        tokenIn: fromSym,
+        tokenOut: toSym,
+        amountIn: amount,
+        config: { kitKey: CIRCLE_KIT_KEY },
+      });
+      toast.success(`Swapped ${amount} ${fromSym} → ${toSym}`, {
+        description: `Tx: ${result.txHash} — view on testnet.arcscan.app`,
+      });
+      setAmount("");
+    } catch (e: any) {
+      toast.error("Swap failed", { description: e?.message ?? "Unknown error" });
+    } finally {
+      setSwapping(false);
+    }
   };
 
   return (
