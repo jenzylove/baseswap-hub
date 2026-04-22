@@ -1,4 +1,19 @@
-import { Sparkles, Github, Twitter, MessageCircle } from "lucide-react";
+import { Sparkles, Github, Twitter } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+const ComingSoon = ({ label }: { label: string }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span
+        aria-disabled="true"
+        className="cursor-not-allowed opacity-50 select-none"
+      >
+        {label}
+      </span>
+    </TooltipTrigger>
+    <TooltipContent>Coming soon</TooltipContent>
+  </Tooltip>
+);
 
 export const SiteFooter = () => (
   <footer className="border-t border-border bg-background">
@@ -14,20 +29,34 @@ export const SiteFooter = () => (
       </div>
 
       <nav className="flex items-center gap-5 text-sm text-muted-foreground">
-        <a href="#" className="hover:text-foreground transition-colors">Docs</a>
-        <a href="#" className="hover:text-foreground transition-colors">Audit</a>
-        <a href="#" className="hover:text-foreground transition-colors">Brand</a>
-        <a href="#" className="hover:text-foreground transition-colors">Terms</a>
+        <a
+          href="https://docs.arc.network"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-foreground transition-colors"
+        >
+          Docs
+        </a>
+        <ComingSoon label="Audit" />
       </nav>
 
       <div className="flex items-center gap-2">
-        <a href="#" aria-label="Twitter" className="h-9 w-9 grid place-items-center rounded-full hover:bg-secondary transition-colors">
+        <a
+          href="https://x.com/Dollar782"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Twitter"
+          className="h-9 w-9 grid place-items-center rounded-full hover:bg-secondary transition-colors"
+        >
           <Twitter className="h-4 w-4" />
         </a>
-        <a href="#" aria-label="Discord" className="h-9 w-9 grid place-items-center rounded-full hover:bg-secondary transition-colors">
-          <MessageCircle className="h-4 w-4" />
-        </a>
-        <a href="#" aria-label="GitHub" className="h-9 w-9 grid place-items-center rounded-full hover:bg-secondary transition-colors">
+        <a
+          href="https://github.com/jenzylove/baseswap-hub"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="GitHub"
+          className="h-9 w-9 grid place-items-center rounded-full hover:bg-secondary transition-colors"
+        >
           <Github className="h-4 w-4" />
         </a>
       </div>
