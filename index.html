@@ -23,6 +23,14 @@
 
   <body>
     <div id="root"></div>
+    <script type="module">
+      // Polyfill Node globals for browser-incompatible web3 SDKs (Circle App Kit).
+      // Must run BEFORE any module imports — ESM hoists imports above main.tsx body.
+      import { Buffer } from "buffer";
+      globalThis.Buffer = globalThis.Buffer ?? Buffer;
+      globalThis.global = globalThis.global ?? globalThis;
+      globalThis.process = globalThis.process ?? { env: {} };
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
