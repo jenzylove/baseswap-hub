@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, Settings2, Sparkles, ChevronDown, Search, Loader2 } from "lucide-react";
 import { useAccount, useBalance, useWalletClient } from "wagmi";
-import { createViemAdapter } from "@circle-fin/adapter-viem-v2";
+import { createViemAdapterFromProvider } from "@circle-fin/adapter-viem-v2";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -155,10 +155,26 @@ export const SwapCard = () => {
       });
       return;
     }
+    if (CIRCLE_KIT_KEY === "REPLACE_WITH_KIT_KEY") {
+      toast.error("Circle kit key not configured", {
+        description: "Open src/lib/circleKit.ts and set your VITE_CIRCLE_KIT_KEY.",
+      });
+      return;
+    }
     setSwapping(true);
     try {
-      const adapter = createViemAdapter({ walletClient });
-      const result = await kit.swap({
+      // The viem adapter expects an EIP-1193 provider, which wagmi's wallet
+      // client exposes via its transport. Cast through `any` because the
+      // exact transport shape isn't part of wagmi's public types.
+      const provider = (walletClient.transport as any) ?? (walletClient as any);
+      const adapter = await createViemAdapterFromProvider({ provider });
+
+      // NOTE: `kit.swap(...)` is the call shape from your spec. The installed
+      // @circle-fin/app-kit version exposes operations under the `AppKit`
+      // class — if the swap surface lives elsewhere in your SDK build, this
+      // will throw at runtime and the toast below will surface the error so
+      // you can adjust the namespace (e.g. `kit.unifiedBalance.spend(...)`).
+      const result = await (kit as any).swap({
         from: { adapter, chain: "Arc_Testnet" },
         tokenIn: fromSym,
         tokenOut: toSym,
@@ -166,7 +182,7 @@ export const SwapCard = () => {
         config: { kitKey: CIRCLE_KIT_KEY },
       });
       toast.success(`Swapped ${amount} ${fromSym} → ${toSym}`, {
-        description: `Tx: ${result.txHash} — view on testnet.arcscan.app`,
+        description: `Tx: ${result?.txHash ?? "submitted"} — view on testnet.arcscan.app`,
       });
       setAmount("");
     } catch (e: any) {
@@ -266,12 +282,20 @@ export const SwapCard = () => {
           size="xl"
           className="w-full mt-4"
           onClick={handleSwap}
+          disabled={swapping}
         >
-          {!isConnected
-            ? "Connect wallet to swap"
-            : amountNum <= 0
-            ? "Enter an amount"
-            : "Swap coming soon — powered by Circle App Kits"}
+          {swapping ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Swapping…
+            </>
+          ) : !isConnected ? (
+            "Connect wallet to swap"
+          ) : amountNum <= 0 ? (
+            "Enter an amount"
+          ) : (
+            `Swap ${fromSym} → ${toSym}`
+          )}
         </Button>
       </div>
     </div>
