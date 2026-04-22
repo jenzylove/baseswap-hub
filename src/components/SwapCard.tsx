@@ -15,7 +15,7 @@ const useTokenBalance = (token: Token) => {
   const { address } = useAccount();
   const { data } = useBalance({
     address,
-    token: token.address,
+    token: token.address as `0x${string}`,
     chainId: ARC_TESTNET_CHAIN_ID,
     query: { enabled: Boolean(address) },
   });
