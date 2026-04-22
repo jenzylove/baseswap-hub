@@ -282,12 +282,20 @@ export const SwapCard = () => {
           size="xl"
           className="w-full mt-4"
           onClick={handleSwap}
+          disabled={swapping}
         >
-          {!isConnected
-            ? "Connect wallet to swap"
-            : amountNum <= 0
-            ? "Enter an amount"
-            : "Swap coming soon — powered by Circle App Kits"}
+          {swapping ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Swapping…
+            </>
+          ) : !isConnected ? (
+            "Connect wallet to swap"
+          ) : amountNum <= 0 ? (
+            "Enter an amount"
+          ) : (
+            `Swap ${fromSym} → ${toSym}`
+          )}
         </Button>
       </div>
     </div>
