@@ -118,7 +118,7 @@ export const SwapCard = () => {
   const from = findToken(fromSym);
   const to = findToken(toSym);
 
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const { data: walletClient } = useWalletClient({ chainId: ARC_TESTNET_CHAIN_ID });
   const fromBalance = useTokenBalance(from);
   const toBalance = useTokenBalance(to);
@@ -140,56 +140,39 @@ export const SwapCard = () => {
   const setMax = () => setAmount(String(fromBalance));
 
   const handleSwap = async () => {
-    if (!connected) {
-      toast.error("Connect your wallet to swap");
-      return;
-    }
-    if (amountNum <= 0) {
-      toast.error("Enter an amount");
-      return;
-    }
-    if (!walletClient) {
-      toast.error("Wallet not ready", {
-        description: "Make sure you're connected to Arc Testnet (Chain ID 5042002).",
-      });
-      return;
-    }
-    if (CIRCLE_KIT_KEY === "REPLACE_WITH_KIT_KEY") {
-      toast.error("Circle kit key not configured", {
-        description: "Open src/lib/circleKit.ts and set your VITE_CIRCLE_KIT_KEY.",
-      });
-      return;
-    }
-    setSwapping(true);
-    try {
-      // The viem adapter expects an EIP-1193 provider, which wagmi's wallet
-      // client exposes via its transport. Cast through `any` because the
-      // exact transport shape isn't part of wagmi's public types.
-      const provider = (walletClient.transport as any) ?? (walletClient as any);
-      const adapter = await createViemAdapterFromProvider({ provider });
-
-      // NOTE: `kit.swap(...)` is the call shape from your spec. The installed
-      // @circle-fin/app-kit version exposes operations under the `AppKit`
-      // class — if the swap surface lives elsewhere in your SDK build, this
-      // will throw at runtime and the toast below will surface the error so
-      // you can adjust the namespace (e.g. `kit.unifiedBalance.spend(...)`).
-      const result = await (kit as any).swap({
-        from: { adapter, chain: "Arc_Testnet" },
+  if (!connected) {
+    toast.error("Connect your wallet to swap");
+    return;
+  }
+  if (amountNum <= 0) {
+    toast.error("Enter an amount");
+    return;
+  }
+  setSwapping(true);
+  try {
+    const response = await fetch('/api/swap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fromChain: "Arc_Testnet",
         tokenIn: fromSym,
         tokenOut: toSym,
         amountIn: amount,
-        config: { kitKey: CIRCLE_KIT_KEY },
-      });
-      toast.success(`Swapped ${amount} ${fromSym} → ${toSym}`, {
-        description: `Tx: ${result?.txHash ?? "submitted"} — view on testnet.arcscan.app`,
-      });
-      setAmount("");
-    } catch (e: any) {
-      toast.error("Swap failed", { description: e?.message ?? "Unknown error" });
-    } finally {
-      setSwapping(false);
-    }
-  };
+        walletAddress: address,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Swap failed');
+    toast.success(`Swapped ${amount} ${fromSym} → ${toSym}`, {
+      description: `Tx: ${data.txHash} — view on testnet.arcscan.app`,
+    });
+    setAmount("");
+  } catch (e: any) {
+    toast.error("Swap failed", { description: e.message });
+  } finally {
+    setSwapping(false);
+  }
+};
 
   return (
     <div className="w-full max-w-md mx-auto">
