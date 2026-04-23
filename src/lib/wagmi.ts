@@ -1,18 +1,28 @@
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { arcTestnet, baseSepolia } from "./chains";
+import { createConfig, http } from "wagmi";
+import { defineChain } from "viem";
+import { rainbowWallet, metaMaskWallet, rabbyWallet } from "@rainbow-me/rainbowkit/wallets";
+import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 
-/**
- * WalletConnect projectId — get a free one at https://cloud.reown.com.
- * The placeholder below works for local dev but will rate-limit in production.
- * Replace via VITE_WALLETCONNECT_PROJECT_ID env var when ready to ship.
- */
-const WALLETCONNECT_PROJECT_ID =
-  import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || "starlight-defi-demo";
+export const arcTestnet = defineChain({
+  id: 5042002,
+  name: "Arc Testnet",
+  nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://rpc.testnet.arc.network"] },
+  },
+  blockExplorers: {
+    default: { name: "ArcScan", url: "https://testnet.arcscan.app" },
+  },
+  testnet: true,
+});
 
-export const wagmiConfig = getDefaultConfig({
-  appName: "Starlight",
-  projectId: WALLETCONNECT_PROJECT_ID,
-  // Arc Testnet listed first → becomes the default network in RainbowKit.
-  chains: [arcTestnet, baseSepolia],
-  ssr: false,
+const connectors = connectorsForWallets(
+  [{ groupName: "Recommended", wallets: [metaMaskWallet, rabbyWallet, rainbowWallet] }],
+  { appName: "Starlight", projectId: "starlight-arc" }
+);
+
+export const wagmiConfig = createConfig({
+  chains: [arcTestnet],
+  connectors,
+  transports: { [arcTestnet.id]: http("https://rpc.testnet.arc.network") },
 });
