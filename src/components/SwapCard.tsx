@@ -138,8 +138,7 @@ export const SwapCard = () => {
   };
 
   const setMax = () => setAmount(String(fromBalance));
-
-  const handleSwap = async () => {
+const handleSwap = async () => {
   if (!connected) {
     toast.error("Connect your wallet to swap");
     return;
