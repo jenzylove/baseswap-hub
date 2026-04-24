@@ -1,20 +1,45 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, Settings2, Sparkles, ChevronDown, Search, Loader2 } from "lucide-react";
-import { useAccount, useBalance, useWalletClient } from "wagmi";
-import { createViemAdapterFromProvider } from "@circle-fin/adapter-viem-v2";
+import { useAccount, useBalance, useWalletClient, useWriteContract, usePublicClient } from "wagmi";
+import { parseUnits, encodeFunctionData } from "viem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { TOKENS, Token, findToken, ARC_TESTNET_CHAIN_ID } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { kit, CIRCLE_KIT_KEY } from "@/lib/circleKit";
 
-/** Read an ERC-20 balance for a token on Arc Testnet. Returns 0 when disconnected. */
+const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3" as `0x${string}`;
+const STABLEFX_ADDRESS = "0x867650F5eAe8df91445971f14d89fd84F0C9a9f8" as `0x${string}`;
+
+const ERC20_ABI = [
+  {
+    name: "approve",
+    type: "function",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    name: "allowance",
+    type: "function",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;
+
 const useTokenBalance = (token: Token) => {
   const { address } = useAccount();
   const { data } = useBalance({
     address,
+    token: token.address,
     chainId: ARC_TESTNET_CHAIN_ID,
     query: { enabled: Boolean(address) },
   });
@@ -71,11 +96,7 @@ const TokenButton = ({ token, onPick }: { token: Token; onPick: (t: Token) => vo
               key={t.symbol}
               token={t}
               connected={Boolean(address)}
-              onPick={() => {
-                onPick(t);
-                setOpen(false);
-                setQ("");
-              }}
+              onPick={() => { onPick(t); setOpen(false); setQ(""); }}
             />
           ))}
         </div>
@@ -102,9 +123,6 @@ const TokenRow = ({ token, connected, onPick }: { token: Token; connected: boole
         <div className="text-sm font-mono">
           {connected ? balance.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "0.00"}
         </div>
-        <div className="text-xs text-muted-foreground">
-          ${(balance * token.usd).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-        </div>
       </div>
     </button>
   );
@@ -114,64 +132,106 @@ export const SwapCard = () => {
   const [fromSym, setFromSym] = useState("USDC");
   const [toSym, setToSym] = useState("EURC");
   const [amount, setAmount] = useState("");
+  const [swapping, setSwapping] = useState(false);
 
   const from = findToken(fromSym);
   const to = findToken(toSym);
 
   const { isConnected, address } = useAccount();
   const { data: walletClient } = useWalletClient({ chainId: ARC_TESTNET_CHAIN_ID });
+  const publicClient = usePublicClient({ chainId: ARC_TESTNET_CHAIN_ID });
   const fromBalance = useTokenBalance(from);
   const toBalance = useTokenBalance(to);
-  const [swapping, setSwapping] = useState(false);
-  const connected = isConnected;
 
   const amountNum = parseFloat(amount) || 0;
   const usdValue = amountNum * from.usd;
-  // tiny simulated fee
   const out = usdValue ? (usdValue * 0.997) / to.usd : 0;
   const pointsEarn = Math.max(0, Math.round(usdValue));
 
-  const flip = () => {
-    setFromSym(toSym);
-    setToSym(fromSym);
-    setAmount("");
-  };
-
+  const flip = () => { setFromSym(toSym); setToSym(fromSym); setAmount(""); };
   const setMax = () => setAmount(String(fromBalance));
-const handleSwap = async () => {
-  if (!connected) {
-    toast.error("Connect your wallet to swap");
-    return;
-  }
-  if (amountNum <= 0) {
-    toast.error("Enter an amount");
-    return;
-  }
-  setSwapping(true);
-  try {
-    const response = await fetch('/api/swap', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fromChain: "Arc_Testnet",
-        tokenIn: fromSym,
-        tokenOut: toSym,
-        amountIn: amount,
-        walletAddress: address,
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Swap failed');
-    toast.success(`Swapped ${amount} ${fromSym} → ${toSym}`, {
-      description: `Tx: ${data.txHash} — view on testnet.arcscan.app`,
-    });
-    setAmount("");
-  } catch (e: any) {
-    toast.error("Swap failed", { description: e.message });
-  } finally {
-    setSwapping(false);
-  }
-};
+
+  const handleSwap = async () => {
+    if (!isConnected || !address) {
+      toast.error("Connect your wallet to swap");
+      return;
+    }
+    if (amountNum <= 0) {
+      toast.error("Enter an amount");
+      return;
+    }
+    if (amountNum > fromBalance) {
+      toast.error("Insufficient balance");
+      return;
+    }
+    if (!walletClient || !publicClient) {
+      toast.error("Wallet not ready — make sure you are on Arc Testnet");
+      return;
+    }
+
+    setSwapping(true);
+    try {
+      const amountInUnits = parseUnits(amount, from.decimals);
+
+      // Step 1 — Approve Permit2 to spend your token
+      toast.info("Step 1/2 — Approving token spend...");
+      const approveTx = await walletClient.writeContract({
+        address: from.address,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [PERMIT2_ADDRESS, amountInUnits],
+        chain: walletClient.chain,
+        account: address,
+      });
+      await publicClient.waitForTransactionReceipt({ hash: approveTx });
+
+      // Step 2 — Execute swap via StableFX
+      toast.info("Step 2/2 — Executing swap...");
+      const swapTx = await walletClient.writeContract({
+        address: STABLEFX_ADDRESS,
+        abi: [
+          {
+            name: "swap",
+            type: "function",
+            inputs: [
+              { name: "tokenIn", type: "address" },
+              { name: "tokenOut", type: "address" },
+              { name: "amountIn", type: "uint256" },
+              { name: "minAmountOut", type: "uint256" },
+              { name: "recipient", type: "address" },
+            ],
+            outputs: [{ name: "amountOut", type: "uint256" }],
+            stateMutability: "nonpayable",
+          },
+        ],
+        functionName: "swap",
+        args: [
+          from.address,
+          to.address,
+          amountInUnits,
+          parseUnits((out * 0.99).toFixed(6), to.decimals), // 1% slippage
+          address,
+        ],
+        chain: walletClient.chain,
+        account: address,
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash: swapTx });
+
+      toast.success(`Swapped ${amount} ${fromSym} → ${to.symbol}!`, {
+        description: `View on ArcScan: testnet.arcscan.app/tx/${swapTx}`,
+      });
+      setAmount("");
+
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Swap failed", {
+        description: e?.shortMessage ?? e?.message ?? "Unknown error",
+      });
+    } finally {
+      setSwapping(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -183,7 +243,6 @@ const handleSwap = async () => {
           </Button>
         </div>
 
-        {/* From */}
         <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span>You pay</span>
@@ -206,7 +265,6 @@ const handleSwap = async () => {
           </div>
         </div>
 
-        {/* Flip */}
         <div className="relative h-0">
           <button
             onClick={flip}
@@ -217,7 +275,6 @@ const handleSwap = async () => {
           </button>
         </div>
 
-        {/* To */}
         <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4 mt-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span>You receive</span>
@@ -234,7 +291,6 @@ const handleSwap = async () => {
           </div>
         </div>
 
-        {/* Quote details */}
         {amountNum > 0 && (
           <div className="mt-4 rounded-2xl bg-primary-soft/60 border border-primary/10 p-3 text-xs space-y-1.5">
             <div className="flex justify-between">
@@ -246,8 +302,8 @@ const handleSwap = async () => {
               <span className="font-medium">~0.01 USDC on Arc</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Route</span>
-              <span className="font-medium">Starlight Aggregator · 3 pools</span>
+              <span className="text-muted-foreground">Slippage</span>
+              <span className="font-medium">1%</span>
             </div>
             <div className="flex justify-between border-t border-primary/10 pt-1.5 mt-1.5">
               <span className="text-primary font-semibold inline-flex items-center gap-1">
@@ -266,14 +322,13 @@ const handleSwap = async () => {
           disabled={swapping}
         >
           {swapping ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Swapping…
-            </>
+            <><Loader2 className="h-4 w-4 animate-spin" /> Swapping…</>
           ) : !isConnected ? (
             "Connect wallet to swap"
           ) : amountNum <= 0 ? (
             "Enter an amount"
+          ) : amountNum > fromBalance ? (
+            "Insufficient balance"
           ) : (
             `Swap ${fromSym} → ${toSym}`
           )}
