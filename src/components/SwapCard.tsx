@@ -1,18 +1,15 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, Settings2, Sparkles, ChevronDown, Search, Loader2 } from "lucide-react";
-import { useAccount, useBalance, useWalletClient, useWriteContract, usePublicClient } from "wagmi";
-import { parseUnits, encodeFunctionData } from "viem";
+import { useAccount, useBalance, useWalletClient, usePublicClient } from "wagmi";
+import { parseUnits } from "viem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { TOKENS, Token, findToken, ARC_TESTNET_CHAIN_ID } from "@/lib/tokens";
+import { TOKENS, Token, findToken, ARC_TESTNET_CHAIN_ID, STARLIGHT_POOL_ADDRESS, POOL_ABI } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3" as `0x${string}`;
-const STABLEFX_ADDRESS = "0x867650F5eAe8df91445971f14d89fd84F0C9a9f8" as `0x${string}`;
-
-const ERC20_ABI = [
+const ERC20_APPROVE_ABI = [
   {
     name: "approve",
     type: "function",
@@ -22,16 +19,6 @@ const ERC20_ABI = [
     ],
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "nonpayable",
-  },
-  {
-    name: "allowance",
-    type: "function",
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-    ],
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
   },
 ] as const;
 
@@ -50,24 +37,16 @@ const TokenButton = ({ token, onPick }: { token: Token; onPick: (t: Token) => vo
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const { address } = useAccount();
-
   const filtered = useMemo(
-    () =>
-      TOKENS.filter(
-        (t) =>
-          t.symbol.toLowerCase().includes(q.toLowerCase()) ||
-          t.name.toLowerCase().includes(q.toLowerCase())
-      ),
-    [q]
+    () => TOKENS.filter((t) =>
+      t.symbol.toLowerCase().includes(q.toLowerCase()) ||
+      t.name.toLowerCase().includes(q.toLowerCase())
+    ), [q]
   );
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 rounded-full bg-secondary hover:bg-secondary/70 transition-colors pl-1 pr-3 py-1 font-semibold"
-        >
+        <button type="button" className="inline-flex items-center gap-2 rounded-full bg-secondary hover:bg-secondary/70 transition-colors pl-1 pr-3 py-1 font-semibold">
           <span className={cn("h-7 w-7 rounded-full grid place-items-center text-[11px] font-bold", token.chip)}>
             {token.symbol.slice(0, 2)}
           </span>
@@ -82,22 +61,12 @@ const TokenButton = ({ token, onPick }: { token: Token; onPick: (t: Token) => vo
         <div className="px-5 pb-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search name or paste address"
-              className="pl-9 rounded-xl h-11"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
+            <Input placeholder="Search name or paste address" className="pl-9 rounded-xl h-11" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
         </div>
         <div className="max-h-80 overflow-y-auto pb-3">
           {filtered.map((t) => (
-            <TokenRow
-              key={t.symbol}
-              token={t}
-              connected={Boolean(address)}
-              onPick={() => { onPick(t); setOpen(false); setQ(""); }}
-            />
+            <TokenRow key={t.symbol} token={t} connected={Boolean(address)} onPick={() => { onPick(t); setOpen(false); setQ(""); }} />
           ))}
         </div>
       </DialogContent>
@@ -108,10 +77,7 @@ const TokenButton = ({ token, onPick }: { token: Token; onPick: (t: Token) => vo
 const TokenRow = ({ token, connected, onPick }: { token: Token; connected: boolean; onPick: () => void }) => {
   const balance = useTokenBalance(token);
   return (
-    <button
-      onClick={onPick}
-      className="w-full flex items-center gap-3 px-5 py-3 hover:bg-secondary text-left transition-colors"
-    >
+    <button onClick={onPick} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-secondary text-left transition-colors">
       <span className={cn("h-9 w-9 rounded-full grid place-items-center text-xs font-bold", token.chip)}>
         {token.symbol.slice(0, 2)}
       </span>
@@ -120,9 +86,7 @@ const TokenRow = ({ token, connected, onPick }: { token: Token; connected: boole
         <div className="text-xs text-muted-foreground truncate">{token.name}</div>
       </div>
       <div className="text-right">
-        <div className="text-sm font-mono">
-          {connected ? balance.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "0.00"}
-        </div>
+        <div className="text-sm font-mono">{connected ? balance.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "0.00"}</div>
       </div>
     </button>
   );
@@ -152,73 +116,41 @@ export const SwapCard = () => {
   const setMax = () => setAmount(String(fromBalance));
 
   const handleSwap = async () => {
-    if (!isConnected || !address) {
-      toast.error("Connect your wallet to swap");
-      return;
-    }
-    if (amountNum <= 0) {
-      toast.error("Enter an amount");
-      return;
-    }
-    if (amountNum > fromBalance) {
-      toast.error("Insufficient balance");
-      return;
-    }
-    if (!walletClient || !publicClient) {
-      toast.error("Wallet not ready — make sure you are on Arc Testnet");
-      return;
-    }
+    if (!isConnected || !address) { toast.error("Connect your wallet to swap"); return; }
+    if (amountNum <= 0) { toast.error("Enter an amount"); return; }
+    if (amountNum > fromBalance) { toast.error("Insufficient balance"); return; }
+    if (!walletClient || !publicClient) { toast.error("Wallet not ready — make sure you are on Arc Testnet"); return; }
 
     setSwapping(true);
     try {
       const amountInUnits = parseUnits(amount, from.decimals);
 
-      // Step 1 — Approve Permit2 to spend your token
-      toast.info("Step 1/2 — Approving token spend...");
+      // Step 1 — Approve pool to spend your token
+      toast.info("Step 1/2 — Approving token...");
       const approveTx = await walletClient.writeContract({
         address: from.address,
-        abi: ERC20_ABI,
+        abi: ERC20_APPROVE_ABI,
         functionName: "approve",
-        args: [PERMIT2_ADDRESS, amountInUnits],
+        args: [STARLIGHT_POOL_ADDRESS, amountInUnits],
         chain: walletClient.chain,
         account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash: approveTx });
+      toast.success("Approved! Now executing swap...");
 
-      // Step 2 — Execute swap via StableFX
-      toast.info("Step 2/2 — Executing swap...");
+      // Step 2 — Execute swap via YOUR StarlightPool contract
+      toast.info("Step 2/2 — Swapping...");
       const swapTx = await walletClient.writeContract({
-        address: STABLEFX_ADDRESS,
-        abi: [
-          {
-            name: "swap",
-            type: "function",
-            inputs: [
-              { name: "tokenIn", type: "address" },
-              { name: "tokenOut", type: "address" },
-              { name: "amountIn", type: "uint256" },
-              { name: "minAmountOut", type: "uint256" },
-              { name: "recipient", type: "address" },
-            ],
-            outputs: [{ name: "amountOut", type: "uint256" }],
-            stateMutability: "nonpayable",
-          },
-        ],
+        address: STARLIGHT_POOL_ADDRESS,
+        abi: POOL_ABI,
         functionName: "swap",
-        args: [
-          from.address,
-          to.address,
-          amountInUnits,
-          parseUnits((out * 0.99).toFixed(6), to.decimals), // 1% slippage
-          address,
-        ],
+        args: [from.address, amountInUnits],
         chain: walletClient.chain,
         account: address,
       });
-
       await publicClient.waitForTransactionReceipt({ hash: swapTx });
 
-      toast.success(`Swapped ${amount} ${fromSym} → ${to.symbol}!`, {
+      toast.success(`Swapped ${amount} ${fromSym} → ${toSym}!`, {
         description: `View on ArcScan: testnet.arcscan.app/tx/${swapTx}`,
       });
       setAmount("");
@@ -252,9 +184,7 @@ export const SwapCard = () => {
           </div>
           <div className="flex items-center gap-3">
             <input
-              type="number"
-              placeholder="0.0"
-              value={amount}
+              type="number" placeholder="0.0" value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="flex-1 bg-transparent outline-none text-3xl font-display font-semibold tracking-tight placeholder:text-muted-foreground/50 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
@@ -266,11 +196,7 @@ export const SwapCard = () => {
         </div>
 
         <div className="relative h-0">
-          <button
-            onClick={flip}
-            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 rounded-xl bg-card border-4 border-background grid place-items-center hover:bg-primary hover:text-primary-foreground transition-colors shadow-elev-md"
-            aria-label="Flip tokens"
-          >
+          <button onClick={flip} className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 rounded-xl bg-card border-4 border-background grid place-items-center hover:bg-primary hover:text-primary-foreground transition-colors shadow-elev-md" aria-label="Flip tokens">
             <ArrowDown className="h-4 w-4" />
           </button>
         </div>
@@ -302,8 +228,8 @@ export const SwapCard = () => {
               <span className="font-medium">~0.01 USDC on Arc</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Slippage</span>
-              <span className="font-medium">1%</span>
+              <span className="text-muted-foreground">Route</span>
+              <span className="font-medium">Starlight Pool · Direct</span>
             </div>
             <div className="flex justify-between border-t border-primary/10 pt-1.5 mt-1.5">
               <span className="text-primary font-semibold inline-flex items-center gap-1">
@@ -314,24 +240,13 @@ export const SwapCard = () => {
           </div>
         )}
 
-        <Button
-          variant="hero"
-          size="xl"
-          className="w-full mt-4"
-          onClick={handleSwap}
-          disabled={swapping}
-        >
+        <Button variant="hero" size="xl" className="w-full mt-4" onClick={handleSwap} disabled={swapping}>
           {swapping ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> Swapping…</>
-          ) : !isConnected ? (
-            "Connect wallet to swap"
-          ) : amountNum <= 0 ? (
-            "Enter an amount"
-          ) : amountNum > fromBalance ? (
-            "Insufficient balance"
-          ) : (
-            `Swap ${fromSym} → ${toSym}`
-          )}
+          ) : !isConnected ? "Connect wallet to swap"
+            : amountNum <= 0 ? "Enter an amount"
+            : amountNum > fromBalance ? "Insufficient balance"
+            : `Swap ${fromSym} → ${toSym}`}
         </Button>
       </div>
     </div>
