@@ -232,15 +232,10 @@ const Bridge = () => {
 
             {/* Success state */}
             {txHash && (
-              
-                href={`https://testnet.arcscan.app/tx/${txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 flex items-center justify-center gap-2 text-sm text-primary hover:underline"
-              >
-                View transaction on ArcScan <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            )}
+  <a href={"https://testnet.arcscan.app/tx/" + txHash} target="_blank" rel="noopener noreferrer" className="mt-4 flex items-center justify-center gap-2 text-sm text-primary hover:underline">
+    View transaction on ArcScan <ExternalLink className="h-3.5 w-3.5" />
+  </a>
+)}
           </div>
 
           {/* Supported chains */}
