@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAccount, useReadContract, useWalletClient, usePublicClient } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Sparkles, TrendingUp, Droplets, Loader2, ExternalLink } from "lucide-react";
 import { findToken, ARC_TESTNET_CHAIN_ID, STARLIGHT_POOL_ADDRESS, POOL_ABI } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
@@ -60,14 +61,13 @@ const usePoolData = () => {
   const reserveA = reserves ? parseFloat(formatUnits(reserves[0], 6)) : 0;
   const reserveB = reserves ? parseFloat(formatUnits(reserves[1], 6)) : 0;
   const tvl = reserveA + reserveB;
-
   const userShareNum = userShares ? Number(userShares) : 0;
   const totalShareNum = totalShares ? Number(totalShares) : 0;
   const poolSharePct = totalShareNum > 0 ? (userShareNum / totalShareNum) * 100 : 0;
   const userValueA = poolSharePct > 0 ? (reserveA * poolSharePct) / 100 : 0;
   const userValueB = poolSharePct > 0 ? (reserveB * poolSharePct) / 100 : 0;
 
-  return { reserveA, reserveB, tvl, poolSharePct, userValueA, userValueB, userShares: userShareNum, totalShares: totalShareNum };
+  return { reserveA, reserveB, tvl, poolSharePct, userValueA, userValueB };
 };
 
 const DepositModal = ({ onClose }: { onClose: () => void }) => {
@@ -89,58 +89,38 @@ const DepositModal = ({ onClose }: { onClose: () => void }) => {
       toast.error("Enter amounts for both tokens");
       return;
     }
-
     setLoading(true);
     try {
       const amountAUnits = parseUnits(amountA, tokenA.decimals);
       const amountBUnits = parseUnits(amountB, tokenB.decimals);
 
-      // Approve USDC
       toast.info("Step 1/3 — Approving USDC...");
       const approveTxA = await walletClient.writeContract({
-        address: tokenA.address,
-        abi: ERC20_APPROVE_ABI,
-        functionName: "approve",
-        args: [STARLIGHT_POOL_ADDRESS, amountAUnits],
-        chain: walletClient.chain,
-        account: address,
+        address: tokenA.address, abi: ERC20_APPROVE_ABI, functionName: "approve",
+        args: [STARLIGHT_POOL_ADDRESS, amountAUnits], chain: walletClient.chain, account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash: approveTxA });
 
-      // Approve EURC
       toast.info("Step 2/3 — Approving EURC...");
       const approveTxB = await walletClient.writeContract({
-        address: tokenB.address,
-        abi: ERC20_APPROVE_ABI,
-        functionName: "approve",
-        args: [STARLIGHT_POOL_ADDRESS, amountBUnits],
-        chain: walletClient.chain,
-        account: address,
+        address: tokenB.address, abi: ERC20_APPROVE_ABI, functionName: "approve",
+        args: [STARLIGHT_POOL_ADDRESS, amountBUnits], chain: walletClient.chain, account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash: approveTxB });
 
-      // Add liquidity
       toast.info("Step 3/3 — Adding liquidity...");
       const liquidityTx = await walletClient.writeContract({
-        address: STARLIGHT_POOL_ADDRESS,
-        abi: POOL_ABI,
-        functionName: "addLiquidity",
-        args: [amountAUnits, amountBUnits],
-        chain: walletClient.chain,
-        account: address,
+        address: STARLIGHT_POOL_ADDRESS, abi: POOL_ABI, functionName: "addLiquidity",
+        args: [amountAUnits, amountBUnits], chain: walletClient.chain, account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash: liquidityTx });
 
-      toast.success("Liquidity added successfully!", {
-        description: `View on ArcScan: testnet.arcscan.app/tx/${liquidityTx}`,
+      toast.success("Liquidity added!", {
+        description: `testnet.arcscan.app/tx/${liquidityTx}`,
       });
-      setAmountA("");
-      setAmountB("");
-      onClose();
+      setAmountA(""); setAmountB(""); onClose();
     } catch (e: any) {
-      toast.error("Deposit failed", {
-        description: e?.shortMessage ?? e?.message ?? "Unknown error",
-      });
+      toast.error("Deposit failed", { description: e?.shortMessage ?? e?.message ?? "Unknown error" });
     } finally {
       setLoading(false);
     }
@@ -148,39 +128,21 @@ const DepositModal = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <div className="space-y-4 p-1">
-      <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4 space-y-3">
-        <div className="text-xs text-muted-foreground font-medium">USDC amount</div>
-        <Input
-          type="number"
-          placeholder="0.0"
-          value={amountA}
-          onChange={(e) => setAmountA(e.target.value)}
-          className="text-lg font-semibold border-0 bg-transparent p-0 h-auto focus-visible:ring-0"
-        />
+      <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4">
+        <div className="text-xs text-muted-foreground mb-2">USDC amount</div>
+        <Input type="number" placeholder="0.0" value={amountA} onChange={(e) => setAmountA(e.target.value)}
+          className="text-lg font-semibold border-0 bg-transparent p-0 h-auto focus-visible:ring-0" />
       </div>
-      <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4 space-y-3">
-        <div className="text-xs text-muted-foreground font-medium">EURC amount</div>
-        <Input
-          type="number"
-          placeholder="0.0"
-          value={amountB}
-          onChange={(e) => setAmountB(e.target.value)}
-          className="text-lg font-semibold border-0 bg-transparent p-0 h-auto focus-visible:ring-0"
-        />
+      <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4">
+        <div className="text-xs text-muted-foreground mb-2">EURC amount</div>
+        <Input type="number" placeholder="0.0" value={amountB} onChange={(e) => setAmountB(e.target.value)}
+          className="text-lg font-semibold border-0 bg-transparent p-0 h-auto focus-visible:ring-0" />
       </div>
       <p className="text-xs text-muted-foreground">
-        You'll receive pool shares proportional to your deposit. Earn 0.3% on every swap through this pool.
+        Earn 0.3% on every swap. Withdraw anytime.
       </p>
-      <Button
-        variant="hero"
-        size="lg"
-        className="w-full"
-        onClick={handleDeposit}
-        disabled={loading || !isConnected}
-      >
-        {loading ? (
-          <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
-        ) : !isConnected ? "Connect wallet first" : "Deposit liquidity"}
+      <Button variant="hero" size="lg" className="w-full" onClick={handleDeposit} disabled={loading || !isConnected}>
+        {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</> : !isConnected ? "Connect wallet first" : "Deposit liquidity"}
       </Button>
     </div>
   );
@@ -193,107 +155,103 @@ export const PoolsSection = () => {
 
   return (
     <section id="pools" className="container py-20">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-accent-soft text-accent px-3 py-1 text-xs font-semibold mb-3">
-            <TrendingUp className="h-3.5 w-3.5" />
-            Live on Arc Testnet
-          </div>
-          <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight">Liquidity pools</h2>
-          <p className="text-muted-foreground mt-2 max-w-xl">
-            Deposit into the Starlight USDC/EURC pool and earn 0.3% on every swap. Your share grows with every trade.
-          </p>
+
+      {/* Header */}
+      <div className="mb-8">
+        <div className="inline-flex items-center gap-2 rounded-full bg-accent-soft text-accent px-3 py-1 text-xs font-semibold mb-3">
+          <TrendingUp className="h-3.5 w-3.5" />
+          Live on Arc Testnet
         </div>
+        <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight">Liquidity pools</h2>
+        <p className="text-muted-foreground mt-2 max-w-xl">
+          Deposit into the USDC/EURC pool, earn 0.3% on every swap, and farm Starlight Points.
+        </p>
       </div>
 
       {/* Pool Card */}
-      <div className="rounded-3xl bg-gradient-card border border-border p-6 shadow-elev-lg mb-6">
-        <div className="flex items-start justify-between gap-3 mb-6">
+      <div className="rounded-3xl bg-gradient-card border border-border shadow-card overflow-hidden">
+
+        {/* Pool header */}
+        <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="flex -space-x-3">
               <TokenChip symbol="USDC" />
               <TokenChip symbol="EURC" />
             </div>
             <div>
-              <div className="font-display font-semibold text-lg">USDC / EURC</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Starlight AMM · 0.3% fee</div>
+              <div className="font-display font-semibold">USDC / EURC</div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Badge variant="secondary" className="rounded-full text-[10px] px-2 py-0 bg-accent-soft text-accent border-0">Stable</Badge>
+                <Badge className="rounded-full text-[10px] px-2 py-0 bg-primary-soft text-primary border-0 hover:bg-primary-soft">Live</Badge>
+              </div>
             </div>
           </div>
-          
-            <a href={`https://testnet.arcscan.app/address/${STARLIGHT_POOL_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1 hover:underline">{"View contract"} <ExternalLink className="h-3 w-3" /></a>
+          <a href={`https://testnet.arcscan.app/address/${STARLIGHT_POOL_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground flex items-center gap-1 hover:text-primary transition-colors">
+            Contract <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
 
-        {/* Real pool stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="rounded-2xl bg-secondary/50 p-4">
+        {/* Stats row */}
+        <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
+          <div className="p-4 text-center">
             <div className="text-xs text-muted-foreground mb-1">TVL</div>
-            <div className="font-display font-bold text-xl">
-              ${tvl > 0 ? tvl.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
-            </div>
+            <div className="font-display font-bold text-lg">${tvl > 0 ? tvl.toFixed(2) : "—"}</div>
           </div>
-          <div className="rounded-2xl bg-secondary/50 p-4">
-            <div className="text-xs text-muted-foreground mb-1">USDC reserve</div>
-            <div className="font-display font-bold text-xl">
-              {reserveA > 0 ? reserveA.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
-            </div>
+          <div className="p-4 text-center">
+            <div className="text-xs text-muted-foreground mb-1">USDC</div>
+            <div className="font-display font-bold text-lg">{reserveA > 0 ? reserveA.toFixed(2) : "—"}</div>
           </div>
-          <div className="rounded-2xl bg-secondary/50 p-4">
-            <div className="text-xs text-muted-foreground mb-1">EURC reserve</div>
-            <div className="font-display font-bold text-xl">
-              {reserveB > 0 ? reserveB.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
-            </div>
-          </div>
-          <div className="rounded-2xl bg-secondary/50 p-4">
-            <div className="text-xs text-muted-foreground mb-1">Fee</div>
-            <div className="font-display font-bold text-xl">0.3%</div>
+          <div className="p-4 text-center">
+            <div className="text-xs text-muted-foreground mb-1">EURC</div>
+            <div className="font-display font-bold text-lg">{reserveB > 0 ? reserveB.toFixed(2) : "—"}</div>
           </div>
         </div>
 
-        {/* User position */}
+        {/* Your position — only shows if connected and has shares */}
         {isConnected && poolSharePct > 0 && (
-          <div className="rounded-2xl bg-primary-soft/60 border border-primary/10 p-4 mb-4">
+          <div className="px-5 py-4 bg-primary-soft/40 border-b border-border">
             <div className="text-xs font-semibold text-primary mb-2">Your position</div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="flex items-center gap-6 text-sm">
               <div>
-                <div className="text-xs text-muted-foreground">Pool share</div>
-                <div className="font-bold">{poolSharePct.toFixed(2)}%</div>
+                <span className="text-muted-foreground text-xs">Share </span>
+                <span className="font-bold">{poolSharePct.toFixed(2)}%</span>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">USDC value</div>
-                <div className="font-bold">{userValueA.toFixed(4)}</div>
+                <span className="text-muted-foreground text-xs">USDC </span>
+                <span className="font-bold">{userValueA.toFixed(2)}</span>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">EURC value</div>
-                <div className="font-bold">{userValueB.toFixed(4)}</div>
+                <span className="text-muted-foreground text-xs">EURC </span>
+                <span className="font-bold">{userValueB.toFixed(2)}</span>
               </div>
             </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between text-xs mb-4">
-          <span className="text-muted-foreground">Rewards</span>
-          <div className="flex items-center gap-1">
-            <span className="rounded-full bg-secondary px-2 py-0.5 font-semibold">0.3% swap fees</span>
-            <span className="rounded-full bg-primary-soft text-primary px-2 py-0.5 font-semibold inline-flex items-center gap-1">
+        {/* Footer */}
+        <div className="p-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="rounded-full bg-secondary px-2 py-0.5 font-medium">0.3% fee</span>
+            <span className="rounded-full bg-primary-soft text-primary px-2 py-0.5 font-medium inline-flex items-center gap-1">
               <Sparkles className="h-3 w-3" /> Points
             </span>
           </div>
+          <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
+            <DialogTrigger asChild>
+              <Button variant="soft" size="sm">
+                <Droplets className="h-4 w-4" />
+                Deposit
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="rounded-3xl sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Deposit into USDC / EURC pool</DialogTitle>
+              </DialogHeader>
+              <DepositModal onClose={() => setDepositOpen(false)} />
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
-          <DialogTrigger asChild>
-            <Button variant="soft" className="w-full">
-              <Droplets className="h-4 w-4" />
-              Deposit liquidity
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="rounded-3xl sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Deposit into USDC / EURC pool</DialogTitle>
-            </DialogHeader>
-            <DepositModal onClose={() => setDepositOpen(false)} />
-          </DialogContent>
-        </Dialog>
       </div>
     </section>
   );
