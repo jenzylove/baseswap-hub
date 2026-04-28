@@ -4,15 +4,7 @@ import { useWallet } from "@/store/wallet";
 import { toast } from "sonner";
 import { useMemo } from "react";
 
-const LEADERBOARD = [
-  { rank: 1, addr: "0x7a3b…9f12", pts: 248_310 },
-  { rank: 2, addr: "arcwhale.eth", pts: 192_847 },
-  { rank: 3, addr: "0x91c4…4a08", pts: 161_204 },
-  { rank: 4, addr: "0x2d8e…b771", pts: 142_005 },
-  { rank: 5, addr: "degenmom.eth", pts: 119_640 },
-  { rank: 6, addr: "0x5c11…ee93", pts: 98_220 },
-  { rank: 7, addr: "0xa4f0…1c5a", pts: 88_104 },
-];
+const LEADERBOARD: { rank: number; addr: string; pts: number }[] = [];
 
 const StatCard = ({
   icon: Icon,
@@ -184,7 +176,7 @@ export const PointsDashboard = () => {
               <Trophy className="h-5 w-5 text-warning" />
               <h3 className="font-display text-lg font-semibold">Season 1 leaderboard</h3>
             </div>
-            <span className="text-xs text-muted-foreground">Updated live</span>
+            <span className="text-xs text-muted-foreground">Season 1 — be the first on the board!</span>
           </div>
           <ul className="divide-y divide-border">
             {userBoard.map((row) => {
