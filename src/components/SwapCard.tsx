@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { TOKENS, Token, findToken, ARC_TESTNET_CHAIN_ID, STARLIGHT_POOL_ADDRESS, POOL_ABI } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-
+import { useWallet } from "@/store/wallet";
 const ERC20_APPROVE_ABI = [
   {
     name: "approve",
@@ -106,7 +106,7 @@ export const SwapCard = () => {
   const publicClient = usePublicClient({ chainId: ARC_TESTNET_CHAIN_ID });
   const fromBalance = useTokenBalance(from);
   const toBalance = useTokenBalance(to);
-
+  const { recordSwap } = useWallet();
   const amountNum = parseFloat(amount) || 0;
   const usdValue = amountNum * from.usd;
   const out = usdValue ? (usdValue * 0.997) / to.usd : 0;
@@ -150,6 +150,7 @@ export const SwapCard = () => {
       });
       await publicClient.waitForTransactionReceipt({ hash: swapTx });
 
+recordSwap(usdValue);
       toast.success(`Swapped ${amount} ${fromSym} → ${toSym}!`, {
         description: `View on ArcScan: testnet.arcscan.app/tx/${swapTx}`,
       });
