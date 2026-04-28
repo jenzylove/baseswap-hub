@@ -8,6 +8,7 @@ const links = [
   { label: "Pools", href: "/#pools" },
   { label: "Points", href: "/#points" },
   { label: "Faucet", href: "/faucet" },
+  { label: "Bridge", href: "/bridge" },
 ];
 
 export const SiteHeader = () => {

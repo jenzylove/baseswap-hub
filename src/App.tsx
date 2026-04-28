@@ -12,6 +12,7 @@ import { wagmiConfig } from "@/lib/wagmi";
 import Index from "./pages/Index.tsx";
 import Faucet from "./pages/Faucet.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import Bridge from "./pages/Bridge.tsx";
 
 import "@rainbow-me/rainbowkit/styles.css";
 
@@ -46,6 +47,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/faucet" element={<Faucet />} />
+                <Route path="/bridge" element={<Bridge />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
