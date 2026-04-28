@@ -22,7 +22,7 @@ export const Hero = () => {
           </h1>
 
           <p className="mt-5 text-lg text-muted-foreground text-balance">
-            The clean, fast home for stablecoin DeFi on Arc. Trade any token, deposit into 25% APR stable pools, and farm points every time you interact.
+            The clean, fast home for stablecoin DeFi on Arc. Swap USDC, deposit into stable pools, and farm Starlight Points every time you interact.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -38,9 +38,9 @@ export const Hero = () => {
 
           <dl className="mt-12 grid grid-cols-3 gap-4 sm:gap-8 max-w-2xl mx-auto">
             {[
-              { k: "$182M", v: "Total volume" },
-              { k: "25%", v: "Stable pool APR" },
-              { k: "48K", v: "Points farmers" },
+              { k: "Live", v: "On Arc Testnet" },
+              { k: "0.3%", v: "Swap fee" },
+              { k: "S1", v: "Season 1 open" },
             ].map((s) => (
               <div key={s.v} className="rounded-2xl border border-border/60 bg-card/60 backdrop-blur px-3 py-4">
                 <dt className="font-display text-2xl sm:text-3xl font-bold tracking-tight">{s.k}</dt>
