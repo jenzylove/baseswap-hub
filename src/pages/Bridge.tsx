@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAccount, useWalletClient, usePublicClient, useBalance } from "wagmi";
-import { createViemAdapterFromWalletClient } from "@circle-fin/adapter-viem-v2";
+import { createViemAdapterFromProvider } from "@circle-fin/adapter-viem-v2";
 import { AppKit } from "@circle-fin/app-kit";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -102,10 +102,10 @@ const Bridge = () => {
     setBridging(true);
     setTxHash(null);
     try {
-      const adapter = await createViemAdapterFromWalletClient({
-        walletClient,
-        publicClient,
-      });
+      const adapter = await createViemAdapterFromProvider({
+  provider: walletClient.transport,
+  publicClient,
+});
 
       const kit = new AppKit();
       toast.info(`Bridging ${amount} USDC from ${fromChain} to ${toChain}...`);
