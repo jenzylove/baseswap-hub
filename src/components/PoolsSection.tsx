@@ -220,13 +220,7 @@ export const PoolsSection = () => {
             </div>
           </div>
           
-            href={`https://testnet.arcscan.app/address/${STARLIGHT_POOL_ADDRESS}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary flex items-center gap-1 hover:underline"
-          >
-            View contract <ExternalLink className="h-3 w-3" />
-          </a>
+            <a href={`https://testnet.arcscan.app/address/${STARLIGHT_POOL_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1 hover:underline">{"View contract"} <ExternalLink className="h-3 w-3" /></a>
         </div>
 
         {/* Real pool stats */}
