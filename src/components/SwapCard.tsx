@@ -139,14 +139,8 @@ export const SwapCard = () => {
         account: address,
       });
 
-      await publicClient.waitForTransactionReceipt({ 
-        hash: approveTx,
-        timeout: 180_000,
-        pollingInterval: 2_000,
-      });
-      toast.success("Approved!");
-
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      toast.success("Approval submitted! Waiting for confirmation...");
+await new Promise((resolve) => setTimeout(resolve, 5000));
 
       toast.info("Step 2/2 — Confirm swap in your wallet...");
       const swapTx = await walletClient.writeContract({
@@ -158,11 +152,7 @@ export const SwapCard = () => {
         account: address,
       });
 
-      await publicClient.waitForTransactionReceipt({ 
-        hash: swapTx,
-        timeout: 180_000,
-        pollingInterval: 2_000,
-      });
+      await new Promise((resolve) => setTimeout(resolve, 5000));
 
       // ── Step 3: Record locally — wrapped so it never crashes swap ─
       try {
