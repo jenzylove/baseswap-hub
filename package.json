@@ -16,6 +16,7 @@
     "@circle-fin/adapter-viem-v2": "^1.8.2",
     "@circle-fin/app-kit": "^1.4.0",
     "@circle-fin/bridge-kit": "^1.0.0",
+    "@supabase/supabase-js": "^2.39.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
