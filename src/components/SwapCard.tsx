@@ -138,15 +138,17 @@ export const SwapCard = () => {
         chain: walletClient.chain,
         account: address,
       });
-      await publicClient.waitForTransactionReceipt({ 
-  hash: approveTx,
-  timeout: 180_000,
-  pollingInterval: 3_000,
-});
-toast.success("Approved! Waiting for swap — Arc can be slow...");
 
-      // ── Step 2: Swap ─────────────────────────────────────────────
-      toast.info("Step 2/2 — Swapping...");
+      await publicClient.waitForTransactionReceipt({ 
+        hash: approveTx,
+        timeout: 180_000,
+        pollingInterval: 2_000,
+      });
+      toast.success("Approved!");
+
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      toast.info("Step 2/2 — Confirm swap in your wallet...");
       const swapTx = await walletClient.writeContract({
         address: STARLIGHT_POOL_ADDRESS,
         abi: POOL_ABI,
@@ -155,11 +157,12 @@ toast.success("Approved! Waiting for swap — Arc can be slow...");
         chain: walletClient.chain,
         account: address,
       });
+
       await publicClient.waitForTransactionReceipt({ 
-  hash: swapTx,
-  timeout: 180_000,
-  pollingInterval: 3_000,
-});
+        hash: swapTx,
+        timeout: 180_000,
+        pollingInterval: 2_000,
+      });
 
       // ── Step 3: Record locally — wrapped so it never crashes swap ─
       try {
