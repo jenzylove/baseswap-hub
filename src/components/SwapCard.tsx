@@ -119,67 +119,89 @@ export const SwapCard = () => {
   const setMax = () => setAmount(String(fromBalance));
 
   const handleSwap = async () => {
-    if (!isConnected || !address) { toast.error("Connect your wallet to swap"); return; }
-    if (amountNum <= 0) { toast.error("Enter an amount"); return; }
-    if (amountNum > fromBalance) { toast.error("Insufficient balance"); return; }
-    if (!walletClient || !publicClient) { toast.error("Wallet not ready — make sure you are on Arc Testnet"); return; }
+  if (!isConnected || !address) { toast.error("Connect your wallet to swap"); return; }
+  if (amountNum <= 0) { toast.error("Enter an amount"); return; }
+  if (amountNum > fromBalance) { toast.error("Insufficient balance"); return; }
+  if (!walletClient || !publicClient) { toast.error("Wallet not ready — make sure you are on Arc Testnet"); return; }
 
-    setSwapping(true);
-    try {
-      const amountInUnits = parseUnits(amount, from.decimals);
+  setSwapping(true);
+  try {
+    const amountInUnits = parseUnits(amount, from.decimals);
 
-      // ── Step 1: Approve ──────────────────────────────────────────
-      toast.info("Step 1/2 — Approving token...");
-      const approveTx = await walletClient.writeContract({
+    // ── Step 1: Approve ──────────────────────────────────────────
+    toast.info("Step 1/2 — Approving token...");
+    await walletClient.writeContract({
+      address: from.address,
+      abi: ERC20_APPROVE_ABI,
+      functionName: "approve",
+      args: [STARLIGHT_POOL_ADDRESS, amountInUnits],
+      chain: walletClient.chain,
+      account: address,
+    });
+
+    // Poll allowance directly until approval is confirmed on-chain
+    toast.info("Waiting for approval to confirm...");
+    let allowanceConfirmed = false;
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 2000)); // wait 2s between checks
+      const allowance = await publicClient.readContract({
         address: from.address,
-        abi: ERC20_APPROVE_ABI,
-        functionName: "approve",
-        args: [STARLIGHT_POOL_ADDRESS, amountInUnits],
-        chain: walletClient.chain,
-        account: address,
+        abi: [{
+          name: "allowance",
+          type: "function",
+          inputs: [{ name: "owner", type: "address" }, { name: "spender", type: "address" }],
+          outputs: [{ name: "", type: "uint256" }],
+          stateMutability: "view",
+        }],
+        functionName: "allowance",
+        args: [address, STARLIGHT_POOL_ADDRESS],
       });
-
-      toast.success("Approval submitted! Waiting for confirmation...");
-await new Promise((resolve) => setTimeout(resolve, 5000));
-
-      toast.info("Step 2/2 — Confirm swap in your wallet...");
-      const swapTx = await walletClient.writeContract({
-        address: STARLIGHT_POOL_ADDRESS,
-        abi: POOL_ABI,
-        functionName: "swap",
-        args: [from.address, amountInUnits],
-        chain: walletClient.chain,
-        account: address,
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-
-      // ── Step 3: Record locally — wrapped so it never crashes swap ─
-      try {
-        recordSwap(usdValue);
-      } catch (localErr) {
-        console.warn("Local recordSwap failed:", localErr);
+      if ((allowance as bigint) >= amountInUnits) {
+        allowanceConfirmed = true;
+        break;
       }
-
-      // ── Step 4: Update Supabase — fire and forget, never a blocker ─
-      upsertLeaderboard(address, pointsEarn, 1, usdValue).catch((err) =>
-        console.warn("Leaderboard update failed (non-critical):", err)
-      );
-
-      toast.success(`Swapped ${amount} ${fromSym} → ${toSym}!`, {
-        description: `View on ArcScan: testnet.arcscan.app/tx/${swapTx}`,
-      });
-      setAmount("");
-
-    } catch (e: any) {
-      console.error(e);
-      toast.error("Swap failed", {
-        description: e?.shortMessage ?? e?.message ?? "Unknown error",
-      });
-    } finally {
-      setSwapping(false);
     }
-  };
+
+    if (!allowanceConfirmed) {
+      toast.error("Approval timed out — please try again");
+      setSwapping(false);
+      return;
+    }
+
+    toast.success("Approved! Executing swap...");
+
+    // ── Step 2: Swap ─────────────────────────────────────────────
+    toast.info("Step 2/2 — Confirm swap in your wallet...");
+    const swapTx = await walletClient.writeContract({
+      address: STARLIGHT_POOL_ADDRESS,
+      abi: POOL_ABI,
+      functionName: "swap",
+      args: [from.address, amountInUnits],
+      chain: walletClient.chain,
+      account: address,
+    });
+
+    // Wait fixed 6s for swap to land (Arc ~2s block time)
+    await new Promise((r) => setTimeout(r, 6000));
+
+    // ── Step 3: Record points ONLY after real swap ────────────────
+    try { recordSwap(usdValue); } catch (_) {}
+    upsertLeaderboard(address, pointsEarn, 1, usdValue).catch(() => {});
+
+    toast.success(`Swapped ${amount} ${fromSym} → ${toSym}!`, {
+      description: `View on ArcScan: testnet.arcscan.app/tx/${swapTx}`,
+    });
+    setAmount("");
+
+  } catch (e: any) {
+    console.error(e);
+    toast.error("Swap failed", {
+      description: e?.shortMessage ?? e?.message ?? "Unknown error",
+    });
+  } finally {
+    setSwapping(false);
+  }
+};
 
   return (
     <div className="w-full max-w-md mx-auto">
