@@ -9,6 +9,8 @@ import { TOKENS, Token, findToken, ARC_TESTNET_CHAIN_ID, STARLIGHT_POOL_ADDRESS,
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useWallet } from "@/store/wallet";
+import { upsertLeaderboard } from "@/lib/supabase";
+
 const ERC20_APPROVE_ABI = [
   {
     name: "approve",
@@ -107,6 +109,7 @@ export const SwapCard = () => {
   const fromBalance = useTokenBalance(from);
   const toBalance = useTokenBalance(to);
   const { recordSwap } = useWallet();
+
   const amountNum = parseFloat(amount) || 0;
   const usdValue = amountNum * from.usd;
   const out = usdValue ? (usdValue * 0.997) / to.usd : 0;
@@ -125,7 +128,7 @@ export const SwapCard = () => {
     try {
       const amountInUnits = parseUnits(amount, from.decimals);
 
-      // Step 1 — Approve pool to spend your token
+      // ── Step 1: Approve ──────────────────────────────────────────
       toast.info("Step 1/2 — Approving token...");
       const approveTx = await walletClient.writeContract({
         address: from.address,
@@ -138,7 +141,7 @@ export const SwapCard = () => {
       await publicClient.waitForTransactionReceipt({ hash: approveTx });
       toast.success("Approved! Now executing swap...");
 
-      // Step 2 — Execute swap via YOUR StarlightPool contract
+      // ── Step 2: Swap ─────────────────────────────────────────────
       toast.info("Step 2/2 — Swapping...");
       const swapTx = await walletClient.writeContract({
         address: STARLIGHT_POOL_ADDRESS,
@@ -150,7 +153,18 @@ export const SwapCard = () => {
       });
       await publicClient.waitForTransactionReceipt({ hash: swapTx });
 
-recordSwap(usdValue);
+      // ── Step 3: Record locally — wrapped so it never crashes swap ─
+      try {
+        recordSwap(usdValue);
+      } catch (localErr) {
+        console.warn("Local recordSwap failed:", localErr);
+      }
+
+      // ── Step 4: Update Supabase — fire and forget, never a blocker ─
+      upsertLeaderboard(address, pointsEarn, 1, usdValue).catch((err) =>
+        console.warn("Leaderboard update failed (non-critical):", err)
+      );
+
       toast.success(`Swapped ${amount} ${fromSym} → ${toSym}!`, {
         description: `View on ArcScan: testnet.arcscan.app/tx/${swapTx}`,
       });
