@@ -129,7 +129,7 @@ export const SwapCard = () => {
     const amountInUnits = parseUnits(amount, from.decimals);
 
     // ── Step 1: Approve ──────────────────────────────────────────
-    toast.info("Step 1/2 — Approving token...");
+    toast.info("Step 1/2 — Approve in your wallet...");
     await walletClient.writeContract({
       address: from.address,
       abi: ERC20_APPROVE_ABI,
@@ -139,36 +139,9 @@ export const SwapCard = () => {
       account: address,
     });
 
-    // Poll allowance directly until approval is confirmed on-chain
-    toast.info("Waiting for approval to confirm...");
-    let allowanceConfirmed = false;
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 2000)); // wait 2s between checks
-      const allowance = await publicClient.readContract({
-        address: from.address,
-        abi: [{
-          name: "allowance",
-          type: "function",
-          inputs: [{ name: "owner", type: "address" }, { name: "spender", type: "address" }],
-          outputs: [{ name: "", type: "uint256" }],
-          stateMutability: "view",
-        }],
-        functionName: "allowance",
-        args: [address, STARLIGHT_POOL_ADDRESS],
-      });
-      if ((allowance as bigint) >= amountInUnits) {
-        allowanceConfirmed = true;
-        break;
-      }
-    }
-
-    if (!allowanceConfirmed) {
-      toast.error("Approval timed out — please try again");
-      setSwapping(false);
-      return;
-    }
-
-    toast.success("Approved! Executing swap...");
+    // Fixed 8s wait — Arc confirms in ~2s, this gives plenty of buffer
+    toast.info("Approval sent! Waiting for confirmation...");
+    await new Promise((r) => setTimeout(r, 8000));
 
     // ── Step 2: Swap ─────────────────────────────────────────────
     toast.info("Step 2/2 — Confirm swap in your wallet...");
@@ -181,23 +154,24 @@ export const SwapCard = () => {
       account: address,
     });
 
-    // Wait fixed 6s for swap to land (Arc ~2s block time)
-    await new Promise((r) => setTimeout(r, 6000));
+    // Fixed 8s wait for swap to land on-chain
+    toast.info("Swap submitted! Confirming on Arc...");
+    await new Promise((r) => setTimeout(r, 8000));
 
-    // ── Step 3: Record points ONLY after real swap ────────────────
+    // ── Step 3: Record — only after swap tx submitted ─────────────
     try { recordSwap(usdValue); } catch (_) {}
     upsertLeaderboard(address, pointsEarn, 1, usdValue).catch(() => {});
 
     toast.success(`Swapped ${amount} ${fromSym} → ${toSym}!`, {
-      description: `View on ArcScan: testnet.arcscan.app/tx/${swapTx}`,
+      description: `Verify: testnet.arcscan.app/tx/${swapTx}`,
     });
     setAmount("");
 
   } catch (e: any) {
     console.error(e);
-    toast.error("Swap failed", {
-      description: e?.shortMessage ?? e?.message ?? "Unknown error",
-    });
+    // If swap was rejected due to insufficient allowance, approval didn't land yet
+    const msg = e?.shortMessage ?? e?.message ?? "Unknown error";
+    toast.error("Swap failed", { description: msg });
   } finally {
     setSwapping(false);
   }
