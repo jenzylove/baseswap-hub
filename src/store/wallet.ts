@@ -1,16 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useAccount, useBalance } from "wagmi";
-
-/* ============================================================
-   Points store — purely off-chain progression (swaps, streaks,
-   referrals). Persisted in localStorage. Keyed by wallet address
-   so different wallets keep separate points.
-   ============================================================ */
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 type PointsState = {
-  // Per-address state map
-  byAddress: Record<
+  byAddress: Record
     string,
     {
       points: number;
@@ -21,11 +16,12 @@ type PointsState = {
       referrals: number;
     }
   >;
-  referralCode: string; // global for this browser
+  referralCode: string;
 
   addPoints: (address: string, n: number) => void;
   recordSwap: (address: string, volumeUsd: number) => void;
   claimDaily: (address: string) => { ok: boolean; gained: number; newStreak: number };
+  syncFromSupabase: (address: string, remote: { points: number; swapsCount: number; volumeUsd: number }) => void;
 };
 
 const genCode = () =>
@@ -91,15 +87,27 @@ const usePointsStore = create<PointsState>()(
         }));
         return { ok: true, gained, newStreak };
       },
+
+      // Merges Supabase data — always takes the HIGHER value so we never lose points
+      syncFromSupabase: (address, remote) =>
+        set((s) => {
+          const cur = s.byAddress[address] ?? blank();
+          return {
+            byAddress: {
+              ...s.byAddress,
+              [address]: {
+                ...cur,
+                points:     Math.max(cur.points,     remote.points),
+                swapsCount: Math.max(cur.swapsCount, remote.swapsCount),
+                volumeUsd:  Math.max(cur.volumeUsd,  remote.volumeUsd),
+              },
+            },
+          };
+        }),
     }),
     { name: "starlight-points-v2" }
   )
 );
-
-/* ============================================================
-   Combined hook — real wagmi connection + persisted points.
-   Returns the same shape consumers were using before.
-   ============================================================ */
 
 export const useWallet = () => {
   const { address, isConnected } = useAccount();
@@ -108,6 +116,34 @@ export const useWallet = () => {
   const store = usePointsStore();
   const key = address?.toLowerCase() ?? "__guest__";
   const data = store.byAddress[key] ?? blank();
+
+  // On wallet connect — fetch from Supabase and sync if remote is higher
+  useEffect(() => {
+    if (!address) return;
+
+    const fetchAndSync = async () => {
+      try {
+        const { data: row } = await supabase
+          .from("leaderboard")
+          .select("points, swaps_count, volume_usd")
+          .eq("wallet_address", address.toLowerCase())
+          .maybeSingle();
+
+        if (row) {
+          store.syncFromSupabase(address.toLowerCase(), {
+            points:     row.points      ?? 0,
+            swapsCount: row.swaps_count ?? 0,
+            volumeUsd:  row.volume_usd  ?? 0,
+          });
+        }
+      } catch (err) {
+        // Silent fail — localStorage still works as fallback
+        console.warn("Supabase sync failed:", err);
+      }
+    };
+
+    fetchAndSync();
+  }, [address]); // runs every time a new wallet connects
 
   return {
     connected: isConnected,
