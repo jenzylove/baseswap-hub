@@ -3,7 +3,7 @@ import { useAccount, useReadContract, useWalletClient, usePublicClient } from "w
 import { parseUnits, formatUnits } from "viem";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, TrendingUp, Droplets, Loader2, ExternalLink } from "lucide-react";
+import { Sparkles, TrendingUp, Droplets, Loader2, ExternalLink, MinusCircle } from "lucide-react";
 import { findToken, ARC_TESTNET_CHAIN_ID, STARLIGHT_POOL_ADDRESS, POOL_ABI } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -67,7 +67,7 @@ const usePoolData = () => {
   const userValueA = poolSharePct > 0 ? (reserveA * poolSharePct) / 100 : 0;
   const userValueB = poolSharePct > 0 ? (reserveB * poolSharePct) / 100 : 0;
 
-  return { reserveA, reserveB, tvl, poolSharePct, userValueA, userValueB };
+  return { reserveA, reserveB, tvl, poolSharePct, userValueA, userValueB, userShareNum };
 };
 
 const DepositModal = ({ onClose }: { onClose: () => void }) => {
@@ -99,21 +99,21 @@ const DepositModal = ({ onClose }: { onClose: () => void }) => {
         address: tokenA.address, abi: ERC20_APPROVE_ABI, functionName: "approve",
         args: [STARLIGHT_POOL_ADDRESS, amountAUnits], chain: walletClient.chain, account: address,
       });
-      await publicClient.waitForTransactionReceipt({ hash: approveTxA });
+      await publicClient.waitForTransactionReceipt({ hash: approveTxA, timeout: 60_000, pollingInterval: 2_000 });
 
       toast.info("Step 2/3 — Approving EURC...");
       const approveTxB = await walletClient.writeContract({
         address: tokenB.address, abi: ERC20_APPROVE_ABI, functionName: "approve",
         args: [STARLIGHT_POOL_ADDRESS, amountBUnits], chain: walletClient.chain, account: address,
       });
-      await publicClient.waitForTransactionReceipt({ hash: approveTxB });
+      await publicClient.waitForTransactionReceipt({ hash: approveTxB, timeout: 60_000, pollingInterval: 2_000 });
 
       toast.info("Step 3/3 — Adding liquidity...");
       const liquidityTx = await walletClient.writeContract({
         address: STARLIGHT_POOL_ADDRESS, abi: POOL_ABI, functionName: "addLiquidity",
         args: [amountAUnits, amountBUnits], chain: walletClient.chain, account: address,
       });
-      await publicClient.waitForTransactionReceipt({ hash: liquidityTx });
+      await publicClient.waitForTransactionReceipt({ hash: liquidityTx, timeout: 60_000, pollingInterval: 2_000 });
 
       toast.success("Liquidity added!", {
         description: `testnet.arcscan.app/tx/${liquidityTx}`,
@@ -138,9 +138,7 @@ const DepositModal = ({ onClose }: { onClose: () => void }) => {
         <Input type="number" placeholder="0.0" value={amountB} onChange={(e) => setAmountB(e.target.value)}
           className="text-lg font-semibold border-0 bg-transparent p-0 h-auto focus-visible:ring-0" />
       </div>
-      <p className="text-xs text-muted-foreground">
-        Earn 0.3% on every swap. Withdraw anytime.
-      </p>
+      <p className="text-xs text-muted-foreground">Earn 0.3% on every swap. Withdraw anytime.</p>
       <Button variant="hero" size="lg" className="w-full" onClick={handleDeposit} disabled={loading || !isConnected}>
         {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</> : !isConnected ? "Connect wallet first" : "Deposit liquidity"}
       </Button>
@@ -148,9 +146,123 @@ const DepositModal = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
+// ── NEW: Withdraw Modal ──────────────────────────────────────────────────────
+const WithdrawModal = ({ userShareNum, userValueA, userValueB, onClose }: {
+  userShareNum: number;
+  userValueA: number;
+  userValueB: number;
+  onClose: () => void;
+}) => {
+  const [pct, setPct] = useState("100");
+  const [loading, setLoading] = useState(false);
+  const { address, isConnected } = useAccount();
+  const { data: walletClient } = useWalletClient({ chainId: ARC_TESTNET_CHAIN_ID });
+  const publicClient = usePublicClient({ chainId: ARC_TESTNET_CHAIN_ID });
+
+  const pctNum = Math.min(100, Math.max(0, parseFloat(pct) || 0));
+  const sharesToBurn = Math.floor((userShareNum * pctNum) / 100);
+  const willReceiveA = (userValueA * pctNum) / 100;
+  const willReceiveB = (userValueB * pctNum) / 100;
+
+  const handleWithdraw = async () => {
+    if (!isConnected || !address || !walletClient || !publicClient) {
+      toast.error("Connect your wallet first");
+      return;
+    }
+    if (sharesToBurn <= 0) {
+      toast.error("Enter a percentage to withdraw");
+      return;
+    }
+    setLoading(true);
+    try {
+      toast.info("Withdrawing liquidity...");
+      const withdrawTx = await walletClient.writeContract({
+        address: STARLIGHT_POOL_ADDRESS,
+        abi: POOL_ABI,
+        functionName: "removeLiquidity",
+        args: [BigInt(sharesToBurn)],
+        chain: walletClient.chain,
+        account: address,
+      });
+      await publicClient.waitForTransactionReceipt({ hash: withdrawTx, timeout: 60_000, pollingInterval: 2_000 });
+
+      toast.success("Liquidity withdrawn!", {
+        description: `testnet.arcscan.app/tx/${withdrawTx}`,
+      });
+      onClose();
+    } catch (e: any) {
+      toast.error("Withdrawal failed", { description: e?.shortMessage ?? e?.message ?? "Unknown error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 p-1">
+      {/* Percentage input */}
+      <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4">
+        <div className="text-xs text-muted-foreground mb-2">Amount to withdraw (%)</div>
+        <div className="flex items-center gap-3">
+          <Input
+            type="number" placeholder="100" value={pct}
+            onChange={(e) => setPct(e.target.value)}
+            min="1" max="100"
+            className="text-lg font-semibold border-0 bg-transparent p-0 h-auto focus-visible:ring-0"
+          />
+          <span className="text-lg font-semibold text-muted-foreground">%</span>
+        </div>
+        {/* Quick select buttons */}
+        <div className="flex gap-2 mt-3">
+          {[25, 50, 75, 100].map((p) => (
+            <button
+              key={p}
+              onClick={() => setPct(String(p))}
+              className={cn(
+                "flex-1 text-xs font-semibold py-1.5 rounded-lg border transition-colors",
+                pctNum === p
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-secondary border-border hover:bg-secondary/70"
+              )}
+            >
+              {p}%
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* You will receive */}
+      {pctNum > 0 && (
+        <div className="rounded-2xl bg-primary-soft/60 border border-primary/10 p-3 text-xs space-y-1.5">
+          <div className="font-semibold text-primary mb-1">You will receive</div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">USDC</span>
+            <span className="font-bold font-mono">~{willReceiveA.toFixed(4)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">EURC</span>
+            <span className="font-bold font-mono">~{willReceiveB.toFixed(4)}</span>
+          </div>
+        </div>
+      )}
+
+      <Button
+        variant="hero" size="lg" className="w-full"
+        onClick={handleWithdraw}
+        disabled={loading || !isConnected || pctNum <= 0}
+      >
+        {loading
+          ? <><Loader2 className="h-4 w-4 animate-spin" /> Withdrawing...</>
+          : !isConnected ? "Connect wallet first"
+          : `Withdraw ${pctNum}%`}
+      </Button>
+    </div>
+  );
+};
+
 export const PoolsSection = () => {
   const [depositOpen, setDepositOpen] = useState(false);
-  const { reserveA, reserveB, tvl, poolSharePct, userValueA, userValueB } = usePoolData();
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const { reserveA, reserveB, tvl, poolSharePct, userValueA, userValueB, userShareNum } = usePoolData();
   const { isConnected } = useAccount();
 
   return (
@@ -207,7 +319,7 @@ export const PoolsSection = () => {
           </div>
         </div>
 
-        {/* Your position — only shows if connected and has shares */}
+        {/* Your position */}
         {isConnected && poolSharePct > 0 && (
           <div className="px-5 py-4 bg-primary-soft/40 border-b border-border">
             <div className="text-xs font-semibold text-primary mb-2">Your position</div>
@@ -236,20 +348,47 @@ export const PoolsSection = () => {
               <Sparkles className="h-3 w-3" /> Points
             </span>
           </div>
-          <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
-            <DialogTrigger asChild>
-              <Button variant="soft" size="sm">
-                <Droplets className="h-4 w-4" />
-                Deposit
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-3xl sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Deposit into USDC / EURC pool</DialogTitle>
-              </DialogHeader>
-              <DepositModal onClose={() => setDepositOpen(false)} />
-            </DialogContent>
-          </Dialog>
+
+          <div className="flex items-center gap-2">
+            {/* Withdraw button — only shows if user has shares */}
+            {isConnected && poolSharePct > 0 && (
+              <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <MinusCircle className="h-4 w-4" />
+                    Withdraw
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="rounded-3xl sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Withdraw from USDC / EURC pool</DialogTitle>
+                  </DialogHeader>
+                  <WithdrawModal
+                    userShareNum={userShareNum}
+                    userValueA={userValueA}
+                    userValueB={userValueB}
+                    onClose={() => setWithdrawOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {/* Deposit button */}
+            <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
+              <DialogTrigger asChild>
+                <Button variant="soft" size="sm">
+                  <Droplets className="h-4 w-4" />
+                  Deposit
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-3xl sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Deposit into USDC / EURC pool</DialogTitle>
+                </DialogHeader>
+                <DepositModal onClose={() => setDepositOpen(false)} />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
       </div>
