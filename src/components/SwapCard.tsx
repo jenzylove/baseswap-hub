@@ -108,7 +108,7 @@ export const SwapCard = () => {
   const publicClient = usePublicClient({ chainId: ARC_TESTNET_CHAIN_ID });
   const fromBalance = useTokenBalance(from);
   const toBalance = useTokenBalance(to);
-  const { recordSwap } = useWallet();
+  const { recordSwap, recordActivity } = useWallet();
 
   const amountNum = parseFloat(amount) || 0;
   const usdValue = amountNum * from.usd;
@@ -164,7 +164,14 @@ export const SwapCard = () => {
     // ── Step 3: Record only after swap confirmed on-chain ─────────
     try { recordSwap(usdValue); } catch (_) {}
     upsertLeaderboard(address, pointsEarn, 1, usdValue).catch(() => {});
-
+    recordActivity({
+    type: "swap",
+     description: `Swapped ${amount} ${fromSym} → ${toSym}`,
+    amount: amountNum,
+    token: fromSym,
+    txHash: swapTx,
+  points: pointsEarn,
+});
     toast.success(`Swapped ${amount} ${fromSym} → ${toSym}!`, {
       description: `Verify: testnet.arcscan.app/tx/${swapTx}`,
     });

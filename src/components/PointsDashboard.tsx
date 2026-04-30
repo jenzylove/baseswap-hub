@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect } from "react";
-import { Sparkles, Flame, Users, Copy, Trophy, Zap } from "lucide-react";
-import { useWallet } from "@/store/wallet";
+import { Sparkles, Flame, Users, Copy, Trophy, Zap, ArrowLeftRight, Droplets, MinusCircle, Gift, Clock, ExternalLink } from "lucide-react";
+import { useWallet, Activity } from "@/store/wallet";
 import { toast } from "sonner";
 import { useAccount } from "wagmi";
 import { upsertLeaderboard, fetchLeaderboard, LeaderboardEntry } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const StatCard = ({
   icon: Icon, label, value, sub, tone = "primary",
@@ -24,21 +25,99 @@ const StatCard = ({
   );
 };
 
+const activityConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+  swap:     { icon: ArrowLeftRight, color: "bg-primary-soft text-primary",   label: "Swap"     },
+  deposit:  { icon: Droplets,       color: "bg-accent-soft text-accent",      label: "Deposit"  },
+  withdraw: { icon: MinusCircle,    color: "bg-warning/10 text-warning",      label: "Withdraw" },
+  bridge:   { icon: ArrowLeftRight, color: "bg-purple-100 text-purple-600",   label: "Bridge"   },
+  faucet:   { icon: Gift,           color: "bg-green-100 text-green-600",     label: "Faucet"   },
+  daily:    { icon: Flame,          color: "bg-orange-100 text-orange-600",   label: "Daily"    },
+};
+
+const timeAgo = (timestamp: string) => {
+  const diff = Date.now() - new Date(timestamp).getTime();
+  const mins = Math.floor(diff / 60000);
+  const hrs  = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (mins < 1)  return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hrs  < 24) return `${hrs}h ago`;
+  return `${days}d ago`;
+};
+
+const ActivityFeed = ({ activities }: { activities: Activity[] }) => {
+  if (activities.length === 0) {
+    return (
+      <div className="px-5 py-12 text-center">
+        <Clock className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">No activity yet — start swapping to see your history!</p>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="divide-y divide-border">
+      {activities.map((a) => {
+        const cfg = activityConfig[a.type] ?? activityConfig.swap;
+        const Icon = cfg.icon;
+        return (
+          <li key={a.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-secondary/30 transition-colors">
+            {/* Icon */}
+            <div className={cn("h-9 w-9 rounded-xl grid place-items-center shrink-0", cfg.color)}>
+              <Icon className="h-4 w-4" />
+            </div>
+
+            {/* Description */}
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">{a.description}</div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-muted-foreground">{timeAgo(a.timestamp)}</span>
+                {a.txHash && (
+                  
+                    href={`https://testnet.arcscan.app/tx/${a.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline"
+                  >
+                    View <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* Points badge */}
+            {a.points && a.points > 0 ? (
+              <div className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary-soft text-primary px-2.5 py-1 text-xs font-bold">
+                <Sparkles className="h-3 w-3" />
+                +{a.points} pts
+              </div>
+            ) : (
+              a.amount && (
+                <div className="shrink-0 text-xs font-mono text-muted-foreground">
+                  {a.amount} {a.token}
+                </div>
+              )
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
+
 export const PointsDashboard = () => {
-  const { connected, points, streakDays, lastClaimDate, swapsCount, volumeUsd, referralCode, referrals, claimDaily } = useWallet();
+  const { connected, points, streakDays, lastClaimDate, swapsCount, volumeUsd, referralCode, referrals, claimDaily, activities } = useWallet();
   const { address } = useAccount();
   const [globalBoard, setGlobalBoard] = useState<LeaderboardEntry[]>([]);
 
   const today = new Date().toISOString().slice(0, 10);
   const claimedToday = lastClaimDate === today;
 
-  // Sync points to Supabase whenever they change
   useEffect(() => {
     if (!address || points === 0) return;
     upsertLeaderboard(address, points, swapsCount, volumeUsd);
   }, [address, points, swapsCount, volumeUsd]);
 
-  // Fetch global leaderboard every 30 seconds
   useEffect(() => {
     const load = async () => {
       const data = await fetchLeaderboard();
@@ -134,6 +213,7 @@ export const PointsDashboard = () => {
           </div>
         </div>
 
+        {/* Leaderboard */}
         <div className="mt-10 rounded-3xl bg-card border border-border shadow-card overflow-hidden">
           <div className="flex items-center justify-between p-5 border-b border-border">
             <div className="flex items-center gap-2">
@@ -164,6 +244,19 @@ export const PointsDashboard = () => {
             )}
           </ul>
         </div>
+
+        {/* Activity Feed */}
+        <div className="mt-6 rounded-3xl bg-card border border-border shadow-card overflow-hidden">
+          <div className="flex items-center justify-between p-5 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              <h3 className="font-display text-lg font-semibold">Activity history</h3>
+            </div>
+            <span className="text-xs text-muted-foreground">Last 50 actions</span>
+          </div>
+          <ActivityFeed activities={activities} />
+        </div>
+
       </div>
     </section>
   );

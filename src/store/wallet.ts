@@ -4,6 +4,19 @@ import { useAccount, useBalance } from "wagmi";
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
+export type ActivityType = "swap" | "deposit" | "withdraw" | "bridge" | "faucet" | "daily";
+
+export type Activity = {
+  id: string;
+  type: ActivityType;
+  description: string;
+  amount?: number;
+  token?: string;
+  txHash?: string;
+  points?: number;
+  timestamp: string;
+};
+
 type PointsState = {
   byAddress: Record
     string,
@@ -14,12 +27,14 @@ type PointsState = {
       swapsCount: number;
       volumeUsd: number;
       referrals: number;
+      activities: Activity[];
     }
   >;
   referralCode: string;
 
   addPoints: (address: string, n: number) => void;
   recordSwap: (address: string, volumeUsd: number) => void;
+  recordActivity: (address: string, activity: Omit<Activity, "id" | "timestamp">) => void;
   claimDaily: (address: string) => { ok: boolean; gained: number; newStreak: number };
   syncFromSupabase: (address: string, remote: { points: number; swapsCount: number; volumeUsd: number }) => void;
 };
@@ -36,6 +51,7 @@ const blank = () => ({
   swapsCount: 0,
   volumeUsd: 0,
   referrals: 0,
+  activities: [] as Activity[],
 });
 
 const usePointsStore = create<PointsState>()(
@@ -67,6 +83,21 @@ const usePointsStore = create<PointsState>()(
           };
         }),
 
+      recordActivity: (address, activity) =>
+        set((s) => {
+          const cur = s.byAddress[address] ?? blank();
+          const newActivity: Activity = {
+            ...activity,
+            id: Math.random().toString(36).slice(2),
+            timestamp: new Date().toISOString(),
+          };
+          // Keep only last 50 activities per wallet
+          const activities = [newActivity, ...(cur.activities ?? [])].slice(0, 50);
+          return {
+            byAddress: { ...s.byAddress, [address]: { ...cur, activities } },
+          };
+        }),
+
       claimDaily: (address) => {
         const cur = get().byAddress[address] ?? blank();
         const today = todayStr();
@@ -78,17 +109,16 @@ const usePointsStore = create<PointsState>()(
           byAddress: {
             ...s.byAddress,
             [address]: {
-              ...cur,
+              ...(s.byAddress[address] ?? blank()),
               lastClaimDate: today,
               streakDays: newStreak,
-              points: cur.points + gained,
+              points: (s.byAddress[address]?.points ?? 0) + gained,
             },
           },
         }));
         return { ok: true, gained, newStreak };
       },
 
-      // Merges Supabase data — always takes the HIGHER value so we never lose points
       syncFromSupabase: (address, remote) =>
         set((s) => {
           const cur = s.byAddress[address] ?? blank();
@@ -117,10 +147,8 @@ export const useWallet = () => {
   const key = address?.toLowerCase() ?? "__guest__";
   const data = store.byAddress[key] ?? blank();
 
-  // On wallet connect — fetch from Supabase and sync if remote is higher
   useEffect(() => {
     if (!address) return;
-
     const fetchAndSync = async () => {
       try {
         const { data: row } = await supabase
@@ -128,7 +156,6 @@ export const useWallet = () => {
           .select("points, swaps_count, volume_usd")
           .eq("wallet_address", address.toLowerCase())
           .maybeSingle();
-
         if (row) {
           store.syncFromSupabase(address.toLowerCase(), {
             points:     row.points      ?? 0,
@@ -137,13 +164,11 @@ export const useWallet = () => {
           });
         }
       } catch (err) {
-        // Silent fail — localStorage still works as fallback
         console.warn("Supabase sync failed:", err);
       }
     };
-
     fetchAndSync();
-  }, [address]); // runs every time a new wallet connects
+  }, [address]);
 
   return {
     connected: isConnected,
@@ -158,9 +183,11 @@ export const useWallet = () => {
     volumeUsd: data.volumeUsd,
     referralCode: store.referralCode,
     referrals: data.referrals,
+    activities: data.activities ?? [],
 
-    addPoints: (n: number) => store.addPoints(key, n),
-    recordSwap: (volumeUsd: number) => store.recordSwap(key, volumeUsd),
-    claimDaily: () => store.claimDaily(key),
+    addPoints:      (n: number) => store.addPoints(key, n),
+    recordSwap:     (volumeUsd: number) => store.recordSwap(key, volumeUsd),
+    recordActivity: (activity: Omit<Activity, "id" | "timestamp">) => store.recordActivity(key, activity),
+    claimDaily:     () => store.claimDaily(key),
   };
 };
