@@ -114,7 +114,13 @@ const DepositModal = ({ onClose }: { onClose: () => void }) => {
         args: [amountAUnits, amountBUnits], chain: walletClient.chain, account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash: liquidityTx, timeout: 60_000, pollingInterval: 2_000 });
-
+try {
+  recordActivity({
+    type: "deposit",
+    description: `Deposited ${amountA} USDC + ${amountB} EURC into pool`,
+    txHash: liquidityTx,
+  });
+} catch (_) {}
       toast.success("Liquidity added!", {
         description: `testnet.arcscan.app/tx/${liquidityTx}`,
       });
@@ -185,6 +191,13 @@ const WithdrawModal = ({ userShareNum, userValueA, userValueB, onClose }: {
         account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash: withdrawTx, timeout: 60_000, pollingInterval: 2_000 });
+try {
+  recordActivity({
+    type: "withdraw",
+    description: `Withdrew ${pctNum}% from USDC/EURC pool`,
+    txHash: withdrawTx,
+  });
+} catch (_) {}
 
       toast.success("Liquidity withdrawn!", {
         description: `testnet.arcscan.app/tx/${withdrawTx}`,
