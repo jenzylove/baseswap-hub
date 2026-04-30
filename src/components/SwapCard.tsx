@@ -130,7 +130,7 @@ export const SwapCard = () => {
 
     // ── Step 1: Approve ──────────────────────────────────────────
     toast.info("Step 1/2 — Approve in your wallet...");
-    await walletClient.writeContract({
+    const approveTx = await walletClient.writeContract({
       address: from.address,
       abi: ERC20_APPROVE_ABI,
       functionName: "approve",
@@ -138,10 +138,12 @@ export const SwapCard = () => {
       chain: walletClient.chain,
       account: address,
     });
-
-    // Fixed 8s wait — Arc confirms in ~2s, this gives plenty of buffer
-    toast.info("Approval sent! Waiting for confirmation...");
-    await new Promise((r) => setTimeout(r, 8000));
+    await publicClient.waitForTransactionReceipt({
+      hash: approveTx,
+      timeout: 60_000,
+      pollingInterval: 2_000,
+    });
+    toast.success("Approved!");
 
     // ── Step 2: Swap ─────────────────────────────────────────────
     toast.info("Step 2/2 — Confirm swap in your wallet...");
@@ -153,12 +155,13 @@ export const SwapCard = () => {
       chain: walletClient.chain,
       account: address,
     });
+    await publicClient.waitForTransactionReceipt({
+      hash: swapTx,
+      timeout: 60_000,
+      pollingInterval: 2_000,
+    });
 
-    // Fixed 8s wait for swap to land on-chain
-    toast.info("Swap submitted! Confirming on Arc...");
-    await new Promise((r) => setTimeout(r, 8000));
-
-    // ── Step 3: Record — only after swap tx submitted ─────────────
+    // ── Step 3: Record only after swap confirmed on-chain ─────────
     try { recordSwap(usdValue); } catch (_) {}
     upsertLeaderboard(address, pointsEarn, 1, usdValue).catch(() => {});
 
@@ -169,9 +172,9 @@ export const SwapCard = () => {
 
   } catch (e: any) {
     console.error(e);
-    // If swap was rejected due to insufficient allowance, approval didn't land yet
-    const msg = e?.shortMessage ?? e?.message ?? "Unknown error";
-    toast.error("Swap failed", { description: msg });
+    toast.error("Swap failed", {
+      description: e?.shortMessage ?? e?.message ?? "Unknown error",
+    });
   } finally {
     setSwapping(false);
   }
