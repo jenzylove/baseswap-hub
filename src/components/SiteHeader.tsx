@@ -6,9 +6,9 @@ import { useWallet } from "@/store/wallet";
 const links = [
   { label: "Swap", href: "/#swap" },
   { label: "Pools", href: "/#pools" },
+  { label: "Bridge", href: "/bridge" },
   { label: "Points", href: "/#points" },
   { label: "Faucet", href: "/faucet" },
-  { label: "Bridge", href: "/bridge" },
 ];
 
 export const SiteHeader = () => {
