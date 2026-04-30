@@ -5,19 +5,22 @@ import { AppKit } from "@circle-fin/app-kit";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { ArrowRight, ArrowLeftRight, Loader2, ExternalLink, ChevronDown } from "lucide-react";
+import { ArrowRight, ArrowLeftRight, Loader2, ExternalLink, ChevronDown, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { ARC_TESTNET_CHAIN_ID } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
+import { createPublicClient, http } from "viem";
+import { baseSepolia, sepolia, avalancheFuji, arbitrumSepolia, optimismSepolia } from "viem/chains";
+import { arcTestnet } from "@/lib/chains";
 
 const CHAINS = [
-  { id: "Arc_Testnet",        label: "Arc Testnet",       color: "bg-blue-500",    chainId: ARC_TESTNET_CHAIN_ID },
-  { id: "Ethereum_Sepolia",   label: "Ethereum Sepolia",  color: "bg-slate-500",   chainId: 11155111 },
-  { id: "Base_Sepolia",       label: "Base Sepolia",      color: "bg-blue-400",    chainId: 84532 },
-  { id: "Avalanche_Fuji",     label: "Avalanche Fuji",    color: "bg-red-500",     chainId: 43113 },
-  { id: "Arbitrum_Sepolia",   label: "Arbitrum Sepolia",  color: "bg-sky-500",     chainId: 421614 },
-  { id: "OP_Sepolia",         label: "OP Sepolia",        color: "bg-red-400",     chainId: 11155420 },
-  { id: "Polygon_Amoy",       label: "Polygon Amoy",      color: "bg-purple-500",  chainId: 80002 },
+  { id: "Arc_Testnet",        label: "Arc Testnet",       color: "bg-blue-500",    chainId: ARC_TESTNET_CHAIN_ID,  viemChain: arcTestnet,       nativeSymbol: "USDC" },
+  { id: "Ethereum_Sepolia",   label: "Ethereum Sepolia",  color: "bg-slate-500",   chainId: 11155111,              viemChain: sepolia,           nativeSymbol: "ETH"  },
+  { id: "Base_Sepolia",       label: "Base Sepolia",      color: "bg-blue-400",    chainId: 84532,                 viemChain: baseSepolia,       nativeSymbol: "ETH"  },
+  { id: "Avalanche_Fuji",     label: "Avalanche Fuji",    color: "bg-red-500",     chainId: 43113,                 viemChain: avalancheFuji,     nativeSymbol: "AVAX" },
+  { id: "Arbitrum_Sepolia",   label: "Arbitrum Sepolia",  color: "bg-sky-500",     chainId: 421614,                viemChain: arbitrumSepolia,   nativeSymbol: "ETH"  },
+  { id: "OP_Sepolia",         label: "OP Sepolia",        color: "bg-red-400",     chainId: 11155420,              viemChain: optimismSepolia,   nativeSymbol: "ETH"  },
+  { id: "Polygon_Amoy",       label: "Polygon Amoy",      color: "bg-purple-500",  chainId: 80002,                 viemChain: null,              nativeSymbol: "MATIC"},
 ];
 
 const ChainSelector = ({
@@ -77,6 +80,7 @@ const Bridge = () => {
   const [amount, setAmount]       = useState("");
   const [bridging, setBridging]   = useState(false);
   const [txHash, setTxHash]       = useState<string | null>(null);
+  const [destGasWarning, setDestGasWarning] = useState<string | null>(null);
 
   const { isConnected, address } = useAccount();
   const { data: walletClient }   = useWalletClient({ chainId: ARC_TESTNET_CHAIN_ID });
@@ -85,27 +89,55 @@ const Bridge = () => {
 
   const amountNum = parseFloat(amount) || 0;
   const bal = balance ? parseFloat(balance.formatted) : 0;
+  const toChainInfo = CHAINS.find(c => c.id === toChain)!;
 
   const flip = () => {
     setFromChain(toChain);
     setToChain(fromChain);
     setAmount("");
     setTxHash(null);
+    setDestGasWarning(null);
+  };
+
+  // Check destination chain gas balance when amount is entered
+  const checkDestGas = async () => {
+    if (!address || !toChainInfo.viemChain || toChainInfo.nativeSymbol === "USDC") {
+      setDestGasWarning(null);
+      return;
+    }
+    try {
+      const destClient = createPublicClient({
+        chain: toChainInfo.viemChain,
+        transport: http(),
+      });
+      const destBalance = await destClient.getBalance({ address });
+      // Warn if less than 0.001 native token (not enough for gas)
+      if (destBalance < BigInt("1000000000000000")) {
+        setDestGasWarning(
+          `You need ${toChainInfo.nativeSymbol} on ${toChainInfo.label} to pay gas when receiving. Get some from a faucet first.`
+        );
+      } else {
+        setDestGasWarning(null);
+      }
+    } catch {
+      setDestGasWarning(null);
+    }
   };
 
   const handleBridge = async () => {
-    if (!isConnected || !address)              { toast.error("Connect your wallet first"); return; }
-    if (amountNum <= 0)                        { toast.error("Enter an amount"); return; }
-    if (amountNum > bal)                       { toast.error("Insufficient balance"); return; }
-    if (!walletClient || !publicClient)        { toast.error("Wallet not ready — make sure you are on Arc Testnet"); return; }
+    if (!isConnected || !address)       { toast.error("Connect your wallet first"); return; }
+    if (amountNum <= 0)                 { toast.error("Enter an amount"); return; }
+    if (amountNum > bal)                { toast.error("Insufficient balance"); return; }
+    if (!walletClient || !publicClient) { toast.error("Wallet not ready — make sure you are on Arc Testnet"); return; }
+    if (destGasWarning)                 { toast.error("Insufficient gas on destination chain", { description: destGasWarning }); return; }
 
     setBridging(true);
     setTxHash(null);
     try {
       const adapter = await createViemAdapterFromProvider({
-  provider: walletClient.transport,
-  publicClient,
-});
+        provider: walletClient.transport,
+        publicClient,
+      });
 
       const kit = new AppKit();
       toast.info(`Bridging ${amount} USDC from ${fromChain} to ${toChain}...`);
@@ -152,13 +184,7 @@ const Bridge = () => {
           {/* Bridge card */}
           <div className="rounded-3xl bg-gradient-card border border-border shadow-elev-lg p-6">
 
-            {/* From chain */}
-            <ChainSelector
-              label="From"
-              value={fromChain}
-              onChange={setFromChain}
-              exclude={toChain}
-            />
+            <ChainSelector label="From" value={fromChain} onChange={setFromChain} exclude={toChain} />
 
             {/* Amount */}
             <div className="mt-4 rounded-2xl bg-secondary/50 border border-border/60 p-4">
@@ -174,28 +200,27 @@ const Bridge = () => {
                 type="number"
                 placeholder="0.0"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => { setAmount(e.target.value); checkDestGas(); }}
                 className="w-full bg-transparent outline-none text-3xl font-display font-semibold tracking-tight placeholder:text-muted-foreground/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
 
             {/* Flip button */}
             <div className="flex justify-center my-3">
-              <button
-                onClick={flip}
-                className="h-10 w-10 rounded-xl bg-card border border-border grid place-items-center hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors shadow-sm"
-              >
+              <button onClick={flip} className="h-10 w-10 rounded-xl bg-card border border-border grid place-items-center hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors shadow-sm">
                 <ArrowLeftRight className="h-4 w-4" />
               </button>
             </div>
 
-            {/* To chain */}
-            <ChainSelector
-              label="To"
-              value={toChain}
-              onChange={setToChain}
-              exclude={fromChain}
-            />
+            <ChainSelector label="To" value={toChain} onChange={(v) => { setToChain(v); setDestGasWarning(null); }} exclude={fromChain} />
+
+            {/* Destination gas warning */}
+            {destGasWarning && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20 p-3 text-xs text-yellow-700 dark:text-yellow-400">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{destGasWarning}</span>
+              </div>
+            )}
 
             {/* Info row */}
             {amountNum > 0 && (
@@ -212,6 +237,12 @@ const Bridge = () => {
                   <span className="text-muted-foreground">Est. time</span>
                   <span className="font-medium">~20 seconds</span>
                 </div>
+                {toChainInfo.nativeSymbol !== "USDC" && (
+                  <div className="flex justify-between border-t border-primary/10 pt-1.5 mt-1.5">
+                    <span className="text-muted-foreground">Gas required on destination</span>
+                    <span className="font-medium text-yellow-600 dark:text-yellow-400">{toChainInfo.nativeSymbol} needed</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -221,21 +252,21 @@ const Bridge = () => {
               size="xl"
               className="w-full mt-4"
               onClick={handleBridge}
-              disabled={bridging || !isConnected}
+              disabled={bridging || !isConnected || Boolean(destGasWarning)}
             >
               {bridging ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Bridging...</>
               ) : !isConnected ? "Connect wallet to bridge"
                 : amountNum <= 0 ? "Enter an amount"
+                : destGasWarning ? `Need ${toChainInfo.nativeSymbol} on destination`
                 : `Bridge ${amountNum > 0 ? amountNum + " USDC" : ""} →`}
             </Button>
 
-            {/* Success state */}
             {txHash && (
-  <a href={"https://testnet.arcscan.app/tx/" + txHash} target="_blank" rel="noopener noreferrer" className="mt-4 flex items-center justify-center gap-2 text-sm text-primary hover:underline">
-    View transaction on ArcScan <ExternalLink className="h-3.5 w-3.5" />
-  </a>
-)}
+              <a href={"https://testnet.arcscan.app/tx/" + txHash} target="_blank" rel="noopener noreferrer" className="mt-4 flex items-center justify-center gap-2 text-sm text-primary hover:underline">
+                View transaction on ArcScan <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
           </div>
 
           {/* Supported chains */}
